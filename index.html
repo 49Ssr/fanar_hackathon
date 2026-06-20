@@ -1,0 +1,850 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Fanar – Islamic Cultural Hub</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0d0d0d;
+      --sidebar-bg: #111111;
+      --surface: #1a1a1a;
+      --surface2: #222222;
+      --gold: #c9a84c;
+      --gold-light: #e8c97a;
+      --gold-dim: #7a6230;
+      --text: #f0ece3;
+      --text-muted: #888880;
+      --border: #2a2a2a;
+      --user-bubble: #1e3a2f;
+      --user-bubble-border: #2d5a42;
+    }
+
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      display: flex;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    /* ── Hamburger ── */
+    .hamburger {
+      position: fixed;
+      top: 16px;
+      left: 16px;
+      z-index: 200;
+      background: #1a1a1a;
+      border: 1px solid #333;
+      border-radius: 10px;
+      width: 40px;
+      height: 40px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 3px;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+    }
+
+    .hamburger:hover { border-color: #555; background: #222; }
+
+    .hamburger span {
+      display: block;
+      width: 18px;
+      height: 2px;
+      background: #ffffff;
+      border-radius: 2px;
+    }
+
+
+    /* Sidebar overlay backdrop */
+    .sidebar-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 99;
+      background: rgba(0,0,0,0.55);
+    }
+
+    .sidebar-backdrop.visible { display: block; }
+
+    /* ── Sidebar ── */
+    .sidebar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      height: 100%;
+      width: 260px;
+      min-width: 260px;
+      background: var(--sidebar-bg);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      padding: 20px 14px;
+      gap: 8px;
+      z-index: 100;
+      transform: translateX(-100%);
+      transition: transform 0.28s cubic-bezier(0.4,0,0.2,1);
+    }
+
+    .sidebar.open { transform: translateX(0); }
+
+    .sidebar-logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 10px 20px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 8px;
+    }
+
+    .sidebar-logo-icon {
+      width: 34px;
+      height: 34px;
+    }
+
+    .sidebar-logo-text {
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      color: #ffffff;
+    }
+
+    .sidebar-btn {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 14px;
+      color: var(--text-muted);
+      border: none;
+      background: transparent;
+      width: 100%;
+      text-align: left;
+      transition: background 0.15s, color 0.15s;
+    }
+
+    .sidebar-btn:hover {
+      background: var(--surface2);
+      color: var(--text);
+    }
+
+    .sidebar-btn.new-chat {
+      background: var(--surface2);
+      color: #ffffff;
+      border: 1px solid #333333;
+      margin-bottom: 8px;
+    }
+
+    .sidebar-btn.new-chat:hover {
+      background: #2a2a2a;
+      border-color: #555555;
+    }
+
+    .sidebar-section-label {
+      font-size: 13px;
+      font-weight: 600;
+      color: #ffffff;
+      opacity: 1;
+      letter-spacing: 0;
+      text-transform: none;
+      padding: 12px 12px 4px;
+    }
+
+    .tool-icon {
+      width: 20px;
+      height: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 15px;
+      flex-shrink: 0;
+    }
+
+    .sidebar-spacer { flex: 1; }
+
+
+    /* ── Main chat area ── */
+    .main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* ── Hero / empty state ── */
+    .hero {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      padding: 40px;
+      transition: opacity 0.3s;
+    }
+
+    .hero.hidden { display: none; }
+
+    .hero-emblem {
+      position: relative;
+      margin-bottom: 8px;
+      line-height: 1;
+    }
+
+    .hero-arabic {
+      font-family: 'Scheherazade New', 'Amiri', 'Traditional Arabic', 'Arial Unicode MS', serif;
+      font-size: 96px;
+      color: #ffffff;
+      text-shadow: 0 0 12px rgba(255,255,255,0.08);
+      display: block;
+      direction: rtl;
+      font-weight: 700;
+      letter-spacing: 2px;
+    }
+
+    .hero-title {
+      font-size: 28px;
+      font-weight: 300;
+      letter-spacing: 4px;
+      color: #ffffff;
+    }
+
+    .hero-sub {
+      font-size: 24px;
+      color: #ffffff;
+      letter-spacing: 0.2px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+    }
+
+
+    /* ── Messages ── */
+    .messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 40px 15% 40px 10%;
+      display: none;
+      flex-direction: column;
+      gap: 20px;
+      scroll-behavior: smooth;
+    }
+
+    .messages.visible { display: flex; }
+
+    .messages::-webkit-scrollbar { width: 4px; }
+    .messages::-webkit-scrollbar-track { background: transparent; }
+    .messages::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+    /* user bubble */
+    .msg-user {
+      align-self: flex-end;
+      max-width: 60%;
+      background: #1a1a1a;
+      border: 1px solid #2a2a2a;
+      border-radius: 12px;
+      padding: 10px 16px;
+      font-size: 14px;
+      line-height: 1.5;
+      color: #ffffff;
+    }
+
+    /* bot response wrapper */
+    .msg-bot {
+      align-self: flex-start;
+      max-width: 500px;
+    }
+
+    .bot-label {
+      font-size: 11px;
+      color: #555555;
+      letter-spacing: 1px;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+    }
+
+    /* ── Event Card with Arabic geometric border ── */
+    .event-card-outer {
+      position: relative;
+      padding: 3px;
+      border-radius: 16px;
+      background: linear-gradient(135deg, #c9a84c, #7a6230, #c9a84c, #e8c97a, #7a6230);
+      background-size: 300% 300%;
+      animation: gradShift 4s ease infinite;
+      box-shadow: 0 0 30px rgba(201,168,76,0.2), 0 0 60px rgba(201,168,76,0.08);
+    }
+
+    @keyframes gradShift {
+      0%   { background-position: 0% 50%; }
+      50%  { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+
+    /* Geometric corner overlays */
+    .event-card-outer::before,
+    .event-card-outer::after {
+      content: '';
+      position: absolute;
+      width: 40px;
+      height: 40px;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Cpolygon points='20,0 24,14 38,14 27,22 31,37 20,29 9,37 13,22 2,14 16,14' fill='%23c9a84c' opacity='0.9'/%3E%3C/svg%3E");
+      background-size: contain;
+      background-repeat: no-repeat;
+      opacity: 0.7;
+    }
+
+    .event-card-outer::before { top: -12px; left: -12px; }
+    .event-card-outer::after  { bottom: -12px; right: -12px; transform: rotate(180deg); }
+
+    .event-card-inner {
+      background: #131310;
+      border-radius: 14px;
+      padding: 24px 26px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* subtle arabesque watermark */
+    .event-card-inner::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120' viewBox='0 0 120 120'%3E%3Cg fill='none' stroke='%23c9a84c' stroke-width='0.6' opacity='0.07'%3E%3Cpolygon points='60,10 70,40 100,40 77,58 86,88 60,70 34,88 43,58 20,40 50,40'/%3E%3Ccircle cx='60' cy='60' r='50'/%3E%3Ccircle cx='60' cy='60' r='35'/%3E%3Cline x1='60' y1='10' x2='60' y2='110'/%3E%3Cline x1='10' y1='60' x2='110' y2='60'/%3E%3Cline x1='18' y1='18' x2='102' y2='102'/%3E%3Cline x1='102' y1='18' x2='18' y2='102'/%3E%3C/g%3E%3C/svg%3E");
+      background-size: 120px 120px;
+      pointer-events: none;
+    }
+
+    .card-date-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: linear-gradient(90deg, var(--gold-dim), #5a4820);
+      color: var(--gold-light);
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      padding: 4px 12px;
+      border-radius: 20px;
+      margin-bottom: 14px;
+    }
+
+    .card-title {
+      font-size: 19px;
+      font-weight: 700;
+      color: var(--text);
+      line-height: 1.3;
+      margin-bottom: 10px;
+    }
+
+    .card-category {
+      display: inline-block;
+      background: #1e1a0f;
+      border: 1px solid var(--gold-dim);
+      color: var(--gold);
+      font-size: 11px;
+      padding: 3px 10px;
+      border-radius: 4px;
+      margin-bottom: 16px;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+    }
+
+    .card-meta {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 20px;
+    }
+
+    .card-meta-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    .card-meta-icon {
+      width: 20px;
+      text-align: center;
+      color: var(--gold);
+      font-size: 14px;
+      flex-shrink: 0;
+    }
+
+    .card-divider {
+      height: 1px;
+      background: linear-gradient(90deg, var(--gold-dim), transparent);
+      margin-bottom: 18px;
+      opacity: 0.4;
+    }
+
+    .card-cta {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .btn-book {
+      background: linear-gradient(135deg, var(--gold), #a07830);
+      color: #0d0d0d;
+      border: none;
+      padding: 11px 24px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      letter-spacing: 0.5px;
+      transition: transform 0.1s, box-shadow 0.2s;
+      box-shadow: 0 4px 20px rgba(201,168,76,0.3);
+    }
+
+    .btn-book:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 28px rgba(201,168,76,0.45);
+    }
+
+    .btn-book:active { transform: translateY(0); }
+
+    .btn-save {
+      background: transparent;
+      border: 1px solid var(--gold-dim);
+      color: var(--gold);
+      padding: 11px 16px;
+      border-radius: 8px;
+      font-size: 14px;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    .btn-save:hover { background: #1e1a0f; }
+
+    /* typing indicator */
+    .typing {
+      display: flex;
+      gap: 5px;
+      padding: 12px 16px;
+      background: var(--surface);
+      border-radius: 16px 16px 16px 4px;
+      width: fit-content;
+      align-items: center;
+    }
+
+    .typing span {
+      width: 7px;
+      height: 7px;
+      background: #555555;
+      border-radius: 50%;
+      animation: bounce 1.2s infinite;
+    }
+
+    .typing span:nth-child(2) { animation-delay: 0.2s; }
+    .typing span:nth-child(3) { animation-delay: 0.4s; }
+
+    @keyframes bounce {
+      0%, 80%, 100% { transform: translateY(0); opacity: 0.5; }
+      40%            { transform: translateY(-6px); opacity: 1; }
+    }
+
+    /* card fade-in */
+    .fade-in {
+      animation: fadeSlideUp 0.4s ease forwards;
+    }
+
+    @keyframes fadeSlideUp {
+      from { opacity: 0; transform: translateY(12px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ── Input bar ── */
+    .input-bar {
+      padding: 16px 40px 20px;
+      background: transparent;
+    }
+
+    .input-wrap {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 14px 16px;
+      transition: border-color 0.2s;
+      min-height: 60px;
+    }
+
+    .input-wrap:focus-within {
+      border-color: #444444;
+      box-shadow: 0 0 0 2px rgba(255,255,255,0.04);
+    }
+
+    .input-wrap input {
+      flex: 1;
+      background: transparent;
+      border: none;
+      outline: none;
+      color: var(--text);
+      font-size: 15px;
+      caret-color: #ffffff;
+    }
+
+    .input-wrap input::placeholder { color: var(--text-muted); }
+
+    .input-action {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      padding: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 6px;
+      transition: color 0.15s, background 0.15s;
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    .input-action:hover { color: #ffffff; background: var(--surface2); }
+
+    .plus-btn {
+      background: var(--surface2);
+      border: 1px solid #333333;
+      color: #888880;
+      cursor: pointer;
+      width: 34px;
+      height: 34px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      line-height: 1;
+      flex-shrink: 0;
+      transition: color 0.15s, border-color 0.15s, background 0.15s;
+    }
+
+    .plus-btn:hover { color: #ffffff; border-color: #555555; background: #2a2a2a; }
+
+    .send-btn {
+      background: #ffffff;
+      border: none;
+      border-radius: 10px;
+      width: 40px;
+      height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      color: #0d0d0d;
+      font-size: 17px;
+      transition: background 0.15s, transform 0.1s;
+      flex-shrink: 0;
+    }
+
+    .send-btn:hover { background: #e0e0e0; }
+    .send-btn:active { transform: scale(0.94); }
+    .send-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+    .input-hint {
+      text-align: center;
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 8px;
+      opacity: 0.5;
+    }
+
+    .sidebar-history {
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+      display: block;
+    }
+
+    .amenu-item {
+      padding: 11px 16px;
+      font-size: 14px;
+      color: #f0ece3;
+      cursor: pointer;
+      transition: background 0.12s;
+    }
+    .amenu-item:hover { background: #252525; }
+
+    .input-footer {
+      text-align: center;
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 10px;
+      opacity: 0.55;
+      line-height: 1.5;
+      padding: 0 20px;
+    }
+  </style>
+</head>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Scheherazade+New:wght@700&display=swap" rel="stylesheet">
+
+<body>
+
+<!-- User avatar + dropdown -->
+<div style="position:fixed;top:12px;right:16px;z-index:300;">
+  <div id="avatarBtn" onclick="toggleAvatarMenu(event)" style="width:38px;height:38px;border-radius:50%;overflow:hidden;border:2px solid #333;cursor:pointer;">
+    <img src="rqtnbrel.png" style="width:100%;height:100%;object-fit:cover;">
+  </div>
+  <div id="avatarMenu" style="display:none;position:absolute;top:46px;right:0;width:210px;background:#1a1a1a;border:1px solid #2a2a2a;border-radius:10px;overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,0.6);">
+    <div style="padding:12px 16px;font-size:12px;color:#666;">Guest User</div>
+    <div style="height:1px;background:#2a2a2a;"></div>
+    <div class="amenu-item">Settings</div>
+    <div class="amenu-item">Send Feedback</div>
+    <div class="amenu-item">About</div>
+    <div class="amenu-item">Terms of Service</div>
+    <div class="amenu-item">Privacy Policy</div>
+    <div style="height:1px;background:#2a2a2a;"></div>
+    <div class="amenu-item">Sign out</div>
+  </div>
+</div>
+
+<!-- Hamburger toggle -->
+<button class="hamburger" id="hamburger" onclick="toggleSidebar()" aria-label="Toggle menu">
+  <span></span><span></span><span></span>
+</button>
+
+<!-- Sidebar backdrop -->
+<div class="sidebar-backdrop" id="backdrop" onclick="closeSidebar()"></div>
+
+<!-- ══ SIDEBAR ══ -->
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-logo"><img src="fanar-badge-charcoal.svg" style="width:32px;height:32px;margin-right:10px;"><span style="font-size:17px;font-weight:700;letter-spacing:2px;color:white;">FANAR</span></div>
+
+  <button class="sidebar-btn new-chat" onclick="newChat()">
+    <span class="tool-icon">✦</span> New Chat
+  </button>
+
+  <div class="sidebar-section-label" style="text-transform:none;">Tools</div>
+
+  <button class="sidebar-btn">
+    <span class="tool-icon">🗓</span> Events & Exhibitions
+  </button>
+  <button class="sidebar-btn">
+    <span class="tool-icon">🕌</span> Prayer Times
+  </button>
+  <button class="sidebar-btn">
+    <span class="tool-icon">📖</span> Islamic Heritage
+  </button>
+  <button class="sidebar-btn">
+    <span class="tool-icon">🎭</span> Cultural Programs
+  </button>
+  <button class="sidebar-btn">
+    <span class="tool-icon">🗺</span> Visitor Guide
+  </button>
+
+  <div class="sidebar-section-label" style="text-transform:none;">History</div>
+
+  <button class="sidebar-btn sidebar-history">What events are this weekend?</button>
+  <button class="sidebar-btn sidebar-history">Find me a pharmacy nearby</button>
+  <button class="sidebar-btn sidebar-history">Show me food delivery options</button>
+  <button class="sidebar-btn sidebar-history">Qatar Calendar events June</button>
+  <button class="sidebar-btn sidebar-history">Book tickets for Diamond League</button>
+
+</aside>
+
+<!-- ══ MAIN ══ -->
+<main class="main">
+
+  <!-- Hero / empty state -->
+  <div class="hero" id="hero">
+    <img src="rqtnbrel.png" style="width:120px; opacity:0.6; display:block; margin: 0 auto 24px;">
+    <p class="hero-sub"><img src="fanar-badge-charcoal.svg" style="width:28px; vertical-align:middle; margin-right:8px;"><strong>How can I help you?</strong></p>
+  </div>
+
+  <!-- Messages -->
+  <div class="messages" id="messages"></div>
+
+  <!-- Input bar -->
+  <div class="input-bar">
+    <div class="input-wrap">
+      <button class="plus-btn" title="Attach or add">+</button>
+      <input
+        type="text"
+        id="chatInput"
+        placeholder="Ask about events, exhibitions, prayer times…"
+        onkeydown="handleKey(event)"
+      />
+      <button class="input-action" title="Voice">🎙</button>
+      <button class="send-btn" id="sendBtn" onclick="sendMessage()" title="Send">
+        ➤
+      </button>
+    </div>
+    <p class="input-footer">
+      Fanar AI · Islamic Cultural Hub · Doha, Qatar<br>
+      Fanar answers may not be accurate. Users should verify information from trusted sources.
+    </p>
+  </div>
+</main>
+
+<script>
+  const hero      = document.getElementById('hero');
+  const messages  = document.getElementById('messages');
+  const input     = document.getElementById('chatInput');
+  const sendBtn   = document.getElementById('sendBtn');
+  const sidebar   = document.getElementById('sidebar');
+  const backdrop  = document.getElementById('backdrop');
+  const hamburger = document.getElementById('hamburger');
+
+  let chatStarted = false;
+
+  const avatarMenu = document.getElementById('avatarMenu');
+
+  function toggleAvatarMenu(e) {
+    e.stopPropagation();
+    const open = avatarMenu.style.display === 'block';
+    avatarMenu.style.display = open ? 'none' : 'block';
+  }
+
+  document.addEventListener('click', () => {
+    avatarMenu.style.display = 'none';
+  });
+
+  function toggleSidebar() {
+    const isOpen = sidebar.classList.toggle('open');
+    backdrop.classList.toggle('visible', isOpen);
+    hamburger.classList.toggle('open', isOpen);
+    hamburger.style.left = isOpen ? '260px' : '16px';
+  }
+
+  function closeSidebar() {
+    sidebar.classList.remove('open');
+    backdrop.classList.remove('visible');
+    hamburger.classList.remove('open');
+    hamburger.style.left = '16px';
+  }
+
+  function handleKey(e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  }
+
+  function sendMessage() {
+    const text = input.value.trim();
+    if (!text) return;
+
+    if (!chatStarted) {
+      hero.classList.add('hidden');
+      messages.classList.add('visible');
+      chatStarted = true;
+    }
+
+    // user bubble
+    appendUserMsg(text);
+    input.value = '';
+    sendBtn.disabled = true;
+
+    // typing indicator
+    const typingEl = appendTyping();
+
+    setTimeout(() => {
+      typingEl.remove();
+      appendBotCard();
+      sendBtn.disabled = false;
+      scrollBottom();
+    }, 1100);
+
+    scrollBottom();
+  }
+
+  function appendUserMsg(text) {
+    const el = document.createElement('div');
+    el.className = 'msg-user';
+    el.textContent = text;
+    messages.appendChild(el);
+    scrollBottom();
+  }
+
+  function appendTyping() {
+    const wrap = document.createElement('div');
+    wrap.className = 'msg-bot';
+    wrap.innerHTML = `
+      <div class="bot-label">Fanar</div>
+      <div class="typing">
+        <span></span><span></span><span></span>
+      </div>`;
+    messages.appendChild(wrap);
+    scrollBottom();
+    return wrap;
+  }
+
+  function appendBotCard() {
+    const wrap = document.createElement('div');
+    wrap.className = 'msg-bot fade-in';
+    wrap.innerHTML = `
+      <div class="bot-label">Fanar · Event Recommendation</div>
+      <div class="event-card-outer">
+        <div class="event-card-inner">
+
+          <div class="card-date-badge">
+            📅 &nbsp;Saturday, 28 June 2026
+          </div>
+
+          <div class="card-title">The Art of Islamic Calligraphy: A Living Tradition</div>
+
+          <span class="card-category">Exhibition &amp; Workshop</span>
+
+          <div class="card-meta">
+            <div class="card-meta-row">
+              <span class="card-meta-icon">🕐</span>
+              <span>6:00 PM – 10:00 PM (Doors open at 5:30 PM)</span>
+            </div>
+            <div class="card-meta-row">
+              <span class="card-meta-icon">📍</span>
+              <span>Fanar – Qatar Islamic Cultural Center, Al Corniche St, Doha</span>
+            </div>
+            <div class="card-meta-row">
+              <span class="card-meta-icon">🎟</span>
+              <span>QAR 45 General · QAR 25 Students · Under 12 Free</span>
+            </div>
+            <div class="card-meta-row">
+              <span class="card-meta-icon">🌐</span>
+              <span>Arabic &amp; English · Photography welcome</span>
+            </div>
+          </div>
+
+          <div class="card-divider"></div>
+
+          <div class="card-cta">
+            <button class="btn-book">Book Tickets</button>
+            <button class="btn-save">♡ Save</button>
+          </div>
+
+        </div>
+      </div>`;
+    messages.appendChild(wrap);
+    scrollBottom();
+  }
+
+  function scrollBottom() {
+    messages.scrollTop = messages.scrollHeight;
+  }
+
+  function newChat() {
+    messages.innerHTML = '';
+    messages.classList.remove('visible');
+    hero.classList.remove('hidden');
+    chatStarted = false;
+    input.value = '';
+    input.focus();
+  }
+</script>
+</body>
+</html>
