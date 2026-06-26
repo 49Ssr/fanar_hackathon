@@ -1,0 +1,226 @@
+{
+  "version": "2026-06-26",
+  "purpose": "Local Qatar transit topology used by Qaarib for metro/tram reasoning. This is topology/context, not live schedules.",
+  "critical_notes": [
+    "Doha Metro has Red, Green, and Gold lines. Msheireb is the central interchange for Red, Green, and Gold.",
+    "Al Bidda is an interchange between Red and Green.",
+    "Legtaifiya connects Doha Metro Red Line with Lusail Tram.",
+    "Hamad International Airport T1 is on the Red Line airport branch. It is not on the Green Line.",
+    "Oqba Ibn Nafie is on the Red Line airport-side path toward Hamad International Airport T1.",
+    "Free Zone, Ras Bu Fontas, and Al Wakra are on the Red Line Al Wakra branch. From Ras Bu Fontas to HIA T1, the user must be careful about Red Line branch/destination signs.",
+    "Qatar National Library, Education City, and Al Shaqab are Green Line stations serving Education City / Qatar Foundation.",
+    "Msheireb Tram is a short local downtown loop. It is not the Doha Metro and not a cross-city tram.",
+    "Education City Tram is a campus tram network linked around Education City / Qatar Foundation stops. It is separate from Doha Metro but connects near Green Line stations.",
+    "Lusail Tram is a Lusail local tram network connected to Doha Metro through Legtaifiya, with Lusail/QNB area also shown on network maps."
+  ],
+  "metro": {
+    "red_line": {
+      "aliases": ["red", "red line", "coastal line"],
+      "core_order_north_to_south": [
+        "Lusail",
+        "Qatar University",
+        "Legtaifiya",
+        "Katara",
+        "Al Qassar",
+        "DECC",
+        "West Bay",
+        "Corniche",
+        "Al Bidda",
+        "Msheireb",
+        "Al Doha Al Jadeeda",
+        "Umm Ghuwailina",
+        "Al Matar Al Qadeem",
+        "Oqba Ibn Nafie"
+      ],
+      "branches": {
+        "airport_branch": ["Oqba Ibn Nafie", "Hamad International Airport T1"],
+        "al_wakra_branch": ["Oqba Ibn Nafie", "Free Zone", "Ras Bu Fontas", "Al Wakra"]
+      },
+      "important_transfers": {
+        "Msheireb": ["Green Line", "Gold Line"],
+        "Al Bidda": ["Green Line"],
+        "Legtaifiya": ["Lusail Tram"],
+        "Lusail": ["Lusail Tram / Lusail QNB area"]
+      },
+      "notes": [
+        "For HIA, use the Red Line airport branch toward Hamad International Airport T1.",
+        "For Al Wakra / Ras Bu Fontas, use the Red Line Al Wakra branch.",
+        "If the user is already on the Al Wakra branch and wants HIA, warn them to check branch/destination signs or transfer as needed."
+      ]
+    },
+    "green_line": {
+      "aliases": ["green", "green line", "education line"],
+      "order_west_to_east": [
+        "Al Riffa",
+        "Education City",
+        "Qatar National Library",
+        "Al Shaqab",
+        "Al Rayyan Al Qadeem",
+        "Al Messila",
+        "Hamad Hospital",
+        "The White Palace",
+        "Al Bidda",
+        "Msheireb",
+        "Al Mansoura"
+      ],
+      "important_transfers": {
+        "Msheireb": ["Red Line", "Gold Line"],
+        "Al Bidda": ["Red Line"],
+        "Education City": ["Education City Tram nearby"],
+        "Qatar National Library": ["Education City Tram nearby"],
+        "Al Shaqab": ["Education City Tram nearby"]
+      },
+      "notes": [
+        "Green Line serves Education City / Qatar Foundation through Education City, Qatar National Library, and Al Shaqab stations.",
+        "Green Line does not go to Hamad International Airport T1."
+      ]
+    },
+    "gold_line": {
+      "aliases": ["gold", "gold line"],
+      "order_west_to_east": [
+        "Al Aziziyah",
+        "Sport City",
+        "Al Waab",
+        "Al Sudan",
+        "Joaan",
+        "Al Sadd",
+        "Bin Mahmoud",
+        "Msheireb",
+        "Souq Waqif",
+        "National Museum",
+        "Ras Bu Aboud"
+      ],
+      "important_transfers": {
+        "Msheireb": ["Red Line", "Green Line"]
+      },
+      "notes": [
+        "Gold Line is useful for Souq Waqif, National Museum, Sport City, Al Aziziyah, and Ras Bu Aboud.",
+        "Gold Line does not go to HIA T1."
+      ]
+    }
+  },
+  "trams": {
+    "msheireb_tram": {
+      "type": "local downtown closed loop",
+      "aliases": ["msheireb tram", "mdd tram", "downtown tram"],
+      "stops": [
+        "Sahat Al Nakheel Station",
+        "Wadi Msheireb Station",
+        "Galleria Station",
+        "Msheireb Prayer Ground Station",
+        "Heritage Quarter Station",
+        "Al Baraha Station",
+        "Sahat Al Masjid Station",
+        "Al Kahraba Street Station",
+        "Al Mariah Street Station"
+      ],
+      "interchange_notes": [
+        "Wadi Msheireb is the practical link toward Msheireb Metro / downtown access.",
+        "Use this tram for local Msheireb Downtown movement, not cross-city travel."
+      ]
+    },
+    "education_city_tram": {
+      "type": "campus tram network",
+      "aliases": ["education city tram", "qf tram", "qatar foundation tram", "ec tram"],
+      "known_metro_links": ["Education City Metro Station", "Qatar National Library Metro Station", "Al Shaqab Metro Station"],
+      "line_1_yellow_key_stops": [
+        "Al Shaqab Station",
+        "SouthNest",
+        "Oxygen Park Station",
+        "Education City Mosque",
+        "Al Khater House",
+        "Multaqa",
+        "2015",
+        "Ceremonial Gate",
+        "Qatar Academy East / North area"
+      ],
+      "line_2_blue_key_stops": [
+        "Mathaf",
+        "EC Stadium North",
+        "Academy Station",
+        "Education City Stadium East",
+        "Qatar Academy South",
+        "NorthNest",
+        "Qatar Academy East",
+        "Qatar Academy North"
+      ],
+      "line_3_grey_key_stops": [
+        "EC Community Housing 1",
+        "EC Community Housing 2",
+        "Researchery West",
+        "Researchery",
+        "Hotels",
+        "QNCC / QSTP",
+        "Sidra"
+      ],
+      "notes": [
+        "Use Education City Tram for Qatar Foundation campus movement after arriving by Green Line.",
+        "For QCRI / HBKU / Minaretein, walking may be exposed; combine tram, short walk, or taxi depending on heat and urgency."
+      ]
+    },
+    "lusail_tram": {
+      "type": "Lusail local tram network",
+      "aliases": ["lusail tram", "lusail lrt"],
+      "metro_links": ["Legtaifiya", "Lusail / Lusail QNB area"],
+      "orange_line_key_stops": [
+        "Legtaifiya",
+        "Marina - South",
+        "Marina - Central",
+        "Yacht Club",
+        "Marina - North",
+        "Tarfat - South",
+        "Al Wessil",
+        "Naifa",
+        "Fox Hills - South",
+        "Downtown Lusail",
+        "Al Khayl Street",
+        "Fox Hills - North",
+        "Crescent Park - North",
+        "Rawdat Lusail",
+        "Erkiyah",
+        "Lusail Stadium",
+        "Al Yasmeen"
+      ],
+      "pink_line_key_stops": [
+        "Legtaifiya",
+        "Marina - South",
+        "Marina - Central",
+        "Yacht Club",
+        "Marina - North",
+        "Tarfat - South",
+        "Tarfat - North",
+        "Wadi",
+        "Seef Lusail - South",
+        "Seef Lusail - North"
+      ],
+      "notes": [
+        "Legtaifiya is the important Red Line to Lusail Tram transfer.",
+        "Use Lusail Tram only after reaching Lusail/Legtaifiya area; it does not serve Education City or HIA."
+      ]
+    }
+  },
+  "aliases": {
+    "hia": "Hamad International Airport T1",
+    "hamad airport": "Hamad International Airport T1",
+    "hamad intl airport": "Hamad International Airport T1",
+    "hamad international airport": "Hamad International Airport T1",
+    "airport": "Hamad International Airport T1",
+    "ras bu funtas": "Ras Bu Fontas",
+    "ras bu fontas": "Ras Bu Fontas",
+    "oqba bin nafe": "Oqba Ibn Nafie",
+    "oqba ibn nafe": "Oqba Ibn Nafie",
+    "oqba ibn nafie": "Oqba Ibn Nafie",
+    "wakra": "Al Wakra",
+    "al wakra": "Al Wakra",
+    "qnl": "Qatar National Library",
+    "qatar national library": "Qatar National Library",
+    "qf": "Education City / Qatar Foundation",
+    "qatar foundation": "Education City / Qatar Foundation",
+    "qcri": "Qatar Computing Research Institute",
+    "hbku": "Hamad Bin Khalifa University"
+  },
+  "source_notes": [
+    "Seeded from Qatar Rail style metro/tram maps supplied during development, public Doha Metro/Lusail/Msheireb/Education City transit references, and local demo needs.",
+    "This file is not live schedule data; use web_search for opening hours, service disruptions, and official current notices."
+  ]
+}
