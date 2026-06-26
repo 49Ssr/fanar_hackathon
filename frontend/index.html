@@ -762,7 +762,7 @@
 <button class="hamburger" id="hamburger" onclick="toggleSidebar()" aria-label="Toggle menu">
   <span></span><span></span><span></span>
 </button>
-<span id="tool-title" style="font-size:17px;font-weight:600;color:white;margin-left:16px;display:none;position:fixed;top:20px;left:68px;z-index:300;"></span>
+<span id="tool-title" style="font-size:17px;font-weight:600;color:white;margin-left:16px;display:inline;position:fixed;top:20px;left:68px;z-index:300;">Qaarib</span>
 
 <!-- Sidebar backdrop -->
 <div class="sidebar-backdrop" id="backdrop" onclick="closeSidebar()"></div>
@@ -778,25 +778,10 @@
   <div class="sidebar-section-label" style="text-transform:none;">Tools</div>
 
   <button class="sidebar-btn" id="qaaribToolBtn">
-    <span class="tool-icon">⛵</span> Qaarib
-  </button>
-  <button class="sidebar-btn">
-    <span class="tool-icon">🗓</span> Events & Exhibitions
-  </button>
-  <button class="sidebar-btn">
-    <span class="tool-icon">🕌</span> Prayer Times
-  </button>
-  <button class="sidebar-btn">
-    <span class="tool-icon">📖</span> Islamic Heritage
-  </button>
-  <button class="sidebar-btn">
-    <span class="tool-icon">🎭</span> Cultural Programs
-  </button>
-  <button class="sidebar-btn">
-    <span class="tool-icon">🗺</span> Visitor Guide
+    <span class="tool-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M11 3v10H3l8-10z" fill="white"/><path d="M13 6v7h7l-7-7z" fill="white" opacity="0.7"/><rect x="2" y="14" width="20" height="2" rx="1" fill="#64b5f6"/><path d="M5 16c0 2 1.5 3 3 3h8c1.5 0 3-1 3-3" fill="#64b5f6" opacity="0.5"/></svg></span> Qaarib
   </button>
 
-  <div class="sidebar-section-label" style="text-transform:none;">History</div>
+<div class="sidebar-section-label" style="text-transform:none;">History</div>
 
   <button class="sidebar-btn sidebar-history">What events are this weekend?</button>
   <button class="sidebar-btn sidebar-history">Find me a pharmacy nearby</button>
@@ -811,9 +796,9 @@
 
   <!-- Hero / empty state -->
   <div class="hero" id="hero">
-    <img src="rqtnbrel.png" style="width:120px; opacity:0.6; display:block; margin: 0 auto 24px;">
-    <p class="hero-sub"><img src="fanar-badge-charcoal.svg" style="width:28px; vertical-align:middle; margin-right:8px;"><strong>How can I help you?</strong></p>
-    <div id="welcome-msg" style="font-size:32px;font-weight:700;color:white;margin-top:8px;display:none;">Welcome to Qaarib</div>
+    <img src="rqtnbrel.png" style="width:100px; opacity:0.6; display:block; margin: 0 auto 16px;">
+    <p style="color:white; font-size:18px; margin-bottom:8px;"><img src="fanar-badge-charcoal.svg" style="width:22px; vertical-align:middle; margin-right:8px;">How can I help you?</p>
+    <div id="welcome-msg" style="font-size:32px;font-weight:700;color:white;margin-top:8px;display:block;">Welcome to Qaarib</div>
   </div>
 
   <!-- Messages -->
@@ -826,7 +811,7 @@
       <input
         type="text"
         id="chatInput"
-        placeholder="Ask about events, exhibitions, prayer times…"
+        placeholder="Ask Qaarib anything…"
         onkeydown="handleKey(event)"
       />
       <button class="input-action" title="Voice">🎙</button>
@@ -895,22 +880,35 @@
       chatStarted = true;
     }
 
-    // user bubble
     appendUserMsg(text);
     input.value = '';
     sendBtn.disabled = true;
 
-    // typing indicator
     const typingEl = appendTyping();
-
-    setTimeout(() => {
-      typingEl.remove();
-      appendBotCard();
-      sendBtn.disabled = false;
-      scrollBottom();
-    }, 1100);
-
     scrollBottom();
+
+    fetch('http://localhost:5000/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: text })
+    })
+      .then(function (res) { return res.json(); })
+      .then(function (data) {
+        typingEl.remove();
+        if (data.error) {
+          appendBotText('Error: ' + data.error);
+        } else {
+          appendBotText(data.response);
+        }
+        sendBtn.disabled = false;
+        scrollBottom();
+      })
+      .catch(function (err) {
+        typingEl.remove();
+        appendBotText('Could not reach the server. Make sure the backend is running.');
+        sendBtn.disabled = false;
+        scrollBottom();
+      });
   }
 
   function appendUserMsg(text) {
@@ -925,13 +923,28 @@
     const wrap = document.createElement('div');
     wrap.className = 'msg-bot';
     wrap.innerHTML = `
-      <div class="bot-label">Fanar</div>
+      <div class="bot-label">Qaarib</div>
       <div class="typing">
         <span></span><span></span><span></span>
       </div>`;
     messages.appendChild(wrap);
     scrollBottom();
     return wrap;
+  }
+
+  function appendBotText(text) {
+    const wrap = document.createElement('div');
+    wrap.className = 'msg-bot fade-in';
+    const label = document.createElement('div');
+    label.className = 'bot-label';
+    label.textContent = 'Qaarib';
+    const bubble = document.createElement('div');
+    bubble.style.cssText = 'background:#1a1a1a;border:1px solid #2a2a2a;border-radius:4px 12px 12px 12px;padding:12px 16px;font-size:14px;line-height:1.6;color:#f0ece3;white-space:pre-wrap;';
+    bubble.textContent = text;
+    wrap.appendChild(label);
+    wrap.appendChild(bubble);
+    messages.appendChild(wrap);
+    scrollBottom();
   }
 
   function appendBotCard() {
@@ -1025,6 +1038,9 @@
       document.body.classList.remove('showing-intro', 'underwater');
       waterOverlay.style.transition = 'none';
       waterOverlay.style.opacity = '0';
+      document.getElementById('tool-title').textContent = 'Qaarib';
+      document.getElementById('tool-title').style.display = 'inline';
+      document.getElementById('welcome-msg').style.display = 'block';
     }, 4000);
   }
 
@@ -1037,7 +1053,6 @@
     waterOverlay.style.transition = '';
     waterOverlay.style.opacity = '0';
     clearTimeout(introTimer);
-    introTimer = setTimeout(triggerUnderwater, 3000);
   }
 
   // Qaarib tool button — show intro screen, auto-enter after 3s
@@ -1049,7 +1064,13 @@
     document.getElementById('welcome-msg').style.display = 'block';
   });
 
-  document.getElementById('chat-ui').style.pointerEvents = 'all';
+  document.getElementById('intro-ui').addEventListener('click', function () {
+    clearTimeout(introTimer);
+    triggerUnderwater();
+  });
+
+  // Show intro on page load
+  showIntro();
 </script>
 
 </div><!-- /#chat-ui -->
