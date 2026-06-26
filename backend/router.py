@@ -12,7 +12,7 @@ Available tools:
 - route_plan
 
 Tool meanings:
-- web_search: live/current web information, events, websites, links, news, opening hours, Qatar-specific service info
+- web_search: live/current web information, events, websites, links, news, opening hours, Qatar-specific service info, official transit/airport/current access details
 - place_lookup: physical place/business/landmark search, address, map location, rating, nearby venues
 - route_plan: getting from one place to another, directions, walking, driving, metro access, traffic, shade, tunnels, parking, "how do I get there"
 
@@ -40,6 +40,16 @@ Route rules:
 - If the user says hot/sweating/melting/outside/without sweating, prefer route_plan with "by car" unless they explicitly asked for walking or metro.
 - For QCRI to Minaretein in heat, query: "Qatar Computing Research Institute to Minaretein Center by car".
 - For Education City navigation, pair route_plan with web_search only if the user explicitly asks about tram, shuttle, tunnels, covered walkways, metro schedules, or bus.
+
+Qatar transit routing rules:
+- If the user asks about Doha Metro / Qatar Rail / tram line topology, use web_search unless it is purely casual.
+- If the user asks how to get between two physical places, use route_plan.
+- If the prompt mixes a route with metro/tram/airport facilities/current access, use route_plan + web_search.
+- If the prompt mentions HIA, airport, Hamad International Airport, prayer room, mosque, drop-off, departures, or terminal access, include web_search for official/current info.
+- If the prompt asks whether Oqba Ibn Nafie, Ras Bu Fontas, Al Wakra, or Free Zone connects to HIA, use web_search for Qatar Rail / Red Line branch verification.
+- HIA T1 is Red Line branch context, not Green Line context.
+- Ras Bu Fontas and Al Wakra are Red Line Al Wakra branch context.
+- Oqba Ibn Nafie is Red Line airport-side context.
 
 Rules:
 - Return valid JSON only.
