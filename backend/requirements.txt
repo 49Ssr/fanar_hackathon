@@ -1,3 +1,11 @@
 requests>=2.31.0
 python-dotenv>=1.0.0
 ddgs>=9.0.0
+google-api-python-client>=2.130.0
+google-auth>=2.29.0
+google-auth-oauthlib>=1.2.0
+
+openai>=1.0.0
+parsedatetime>=2.6
+word2number>=1.1
+pydantic>=2.0.0

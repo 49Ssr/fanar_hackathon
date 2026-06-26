@@ -1,226 +1,573 @@
 {
-  "version": "2026-06-26",
-  "purpose": "Local Qatar transit topology used by Qaarib for metro/tram reasoning. This is topology/context, not live schedules.",
+  "version": "2026-06-26-v6.3",
+  "purpose": "Qaarib local Qatar transit graph. This is rail/tram topology, not live schedules.",
   "critical_notes": [
-    "Doha Metro has Red, Green, and Gold lines. Msheireb is the central interchange for Red, Green, and Gold.",
+    "Treat HIA as one normal Red Line branch destination, not a special-case router intent.",
+    "Msheireb is the main interchange between Red, Green and Gold lines.",
     "Al Bidda is an interchange between Red and Green.",
-    "Legtaifiya connects Doha Metro Red Line with Lusail Tram.",
-    "Hamad International Airport T1 is on the Red Line airport branch. It is not on the Green Line.",
-    "Oqba Ibn Nafie is on the Red Line airport-side path toward Hamad International Airport T1.",
-    "Free Zone, Ras Bu Fontas, and Al Wakra are on the Red Line Al Wakra branch. From Ras Bu Fontas to HIA T1, the user must be careful about Red Line branch/destination signs.",
-    "Qatar National Library, Education City, and Al Shaqab are Green Line stations serving Education City / Qatar Foundation.",
-    "Msheireb Tram is a short local downtown loop. It is not the Doha Metro and not a cross-city tram.",
-    "Education City Tram is a campus tram network linked around Education City / Qatar Foundation stops. It is separate from Doha Metro but connects near Green Line stations.",
-    "Lusail Tram is a Lusail local tram network connected to Doha Metro through Legtaifiya, with Lusail/QNB area also shown on network maps."
+    "Legtaifiya is the key interchange from Doha Metro Red Line to Lusail Tram.",
+    "Hamad International Airport T1 is on the Red Line airport branch.",
+    "Al Wakra, Ras Bu Fontas and Free Zone are on the Red Line Al Wakra branch.",
+    "Qatar National Library, Education City, Al Shaqab and Al Rayyan Al Qadeem are on the Green Line.",
+    "Msheireb Tram is a local loop inside Msheireb Downtown; it is not the citywide metro.",
+    "Education City Tram is a Qatar Foundation campus tram and is separate from Doha Metro.",
+    "Use live web/tool results only for schedules, disruptions, opening/access rules and airport procedural details.",
+    "Transit graph contains stations/interchanges/tram stops only. Landmarks and venues are handled as places/destinations, not graph nodes."
   ],
-  "metro": {
-    "red_line": {
-      "aliases": ["red", "red line", "coastal line"],
-      "core_order_north_to_south": [
-        "Lusail",
-        "Qatar University",
-        "Legtaifiya",
-        "Katara",
-        "Al Qassar",
-        "DECC",
-        "West Bay",
-        "Corniche",
-        "Al Bidda",
-        "Msheireb",
-        "Al Doha Al Jadeeda",
-        "Umm Ghuwailina",
-        "Al Matar Al Qadeem",
-        "Oqba Ibn Nafie"
-      ],
-      "branches": {
-        "airport_branch": ["Oqba Ibn Nafie", "Hamad International Airport T1"],
-        "al_wakra_branch": ["Oqba Ibn Nafie", "Free Zone", "Ras Bu Fontas", "Al Wakra"]
-      },
-      "important_transfers": {
-        "Msheireb": ["Green Line", "Gold Line"],
-        "Al Bidda": ["Green Line"],
-        "Legtaifiya": ["Lusail Tram"],
-        "Lusail": ["Lusail Tram / Lusail QNB area"]
-      },
-      "notes": [
-        "For HIA, use the Red Line airport branch toward Hamad International Airport T1.",
-        "For Al Wakra / Ras Bu Fontas, use the Red Line Al Wakra branch.",
-        "If the user is already on the Al Wakra branch and wants HIA, warn them to check branch/destination signs or transfer as needed."
+  "nodes": {
+    "Lusail": {
+      "aliases": [
+        "lusail qnb",
+        "lusail station"
       ]
     },
-    "green_line": {
-      "aliases": ["green", "green line", "education line"],
-      "order_west_to_east": [
-        "Al Riffa",
-        "Education City",
-        "Qatar National Library",
-        "Al Shaqab",
-        "Al Rayyan Al Qadeem",
-        "Al Messila",
-        "Hamad Hospital",
-        "The White Palace",
-        "Al Bidda",
-        "Msheireb",
-        "Al Mansoura"
-      ],
-      "important_transfers": {
-        "Msheireb": ["Red Line", "Gold Line"],
-        "Al Bidda": ["Red Line"],
-        "Education City": ["Education City Tram nearby"],
-        "Qatar National Library": ["Education City Tram nearby"],
-        "Al Shaqab": ["Education City Tram nearby"]
-      },
-      "notes": [
-        "Green Line serves Education City / Qatar Foundation through Education City, Qatar National Library, and Al Shaqab stations.",
-        "Green Line does not go to Hamad International Airport T1."
+    "Qatar University": {
+      "aliases": [
+        "qatar university station"
       ]
     },
-    "gold_line": {
-      "aliases": ["gold", "gold line"],
-      "order_west_to_east": [
-        "Al Aziziyah",
-        "Sport City",
-        "Al Waab",
-        "Al Sudan",
-        "Joaan",
-        "Al Sadd",
-        "Bin Mahmoud",
-        "Msheireb",
-        "Souq Waqif",
-        "National Museum",
-        "Ras Bu Aboud"
-      ],
-      "important_transfers": {
-        "Msheireb": ["Red Line", "Green Line"]
-      },
-      "notes": [
-        "Gold Line is useful for Souq Waqif, National Museum, Sport City, Al Aziziyah, and Ras Bu Aboud.",
-        "Gold Line does not go to HIA T1."
+    "Legtaifiya": {
+      "aliases": [
+        "legtaifiya metro",
+        "legtaifiya station"
+      ]
+    },
+    "Katara": {
+      "aliases": [
+        "katara station"
+      ]
+    },
+    "Al Qassar": {
+      "aliases": [
+        "qassar",
+        "al qassar station"
+      ]
+    },
+    "DECC": {
+      "aliases": [
+        "decc station"
+      ]
+    },
+    "West Bay": {
+      "aliases": [
+        "west bay qic",
+        "west bay station"
+      ]
+    },
+    "Corniche": {
+      "aliases": [
+        "corniche station"
+      ]
+    },
+    "Al Bidda": {
+      "aliases": [
+        "bidda",
+        "al bidda station"
+      ]
+    },
+    "Msheireb": {
+      "aliases": [
+        "msheireb metro",
+        "msheireb station",
+        "mshereib",
+        "mushreib"
+      ]
+    },
+    "Al Doha Al Jadeeda": {
+      "aliases": [
+        "doha al jadeeda"
+      ]
+    },
+    "Umm Ghuwailina": {
+      "aliases": [
+        "umm ghuwailina station"
+      ]
+    },
+    "Al Matar Al Qadeem": {
+      "aliases": [
+        "old airport",
+        "al matar"
+      ]
+    },
+    "Oqba Ibn Nafie": {
+      "aliases": [
+        "oqba",
+        "oqba bin nafe",
+        "oqba ibn nafe",
+        "oqba bin nafie",
+        "oqba ibn nafie"
+      ]
+    },
+    "Hamad International Airport T1": {
+      "aliases": [
+        "hia",
+        "hia t1",
+        "airport",
+        "hamad airport",
+        "hamad intl airport",
+        "hamad international airport",
+        "hamad international airport terminal 1"
+      ]
+    },
+    "Free Zone": {
+      "aliases": [
+        "free zone station"
+      ]
+    },
+    "Ras Bu Fontas": {
+      "aliases": [
+        "ras bu funtas",
+        "ras bu fontas",
+        "ras bu funtas metro",
+        "ras bu fontas metro"
+      ]
+    },
+    "Al Wakra": {
+      "aliases": [
+        "wakra",
+        "al wakra metro",
+        "wakra metro"
+      ]
+    },
+    "Al Riffa": {
+      "aliases": [
+        "riffa",
+        "mall of qatar"
+      ]
+    },
+    "Education City": {
+      "aliases": [
+        "education city metro",
+        "education city station"
+      ]
+    },
+    "Qatar National Library": {
+      "aliases": [
+        "qnl",
+        "qatar national library station"
+      ]
+    },
+    "Al Shaqab": {
+      "aliases": [
+        "al-shaqab",
+        "shaqab",
+        "al shaqab station"
+      ]
+    },
+    "Al Rayyan Al Qadeem": {
+      "aliases": [
+        "rayyan al qadeem",
+        "alrayyan al qadeem",
+        "al rayyan qadeem"
+      ]
+    },
+    "Al Messila": {
+      "aliases": [
+        "messila",
+        "al messila station"
+      ]
+    },
+    "Hamad Hospital": {
+      "aliases": [
+        "hamad hospital station"
+      ]
+    },
+    "The White Palace": {
+      "aliases": [
+        "white palace"
+      ]
+    },
+    "Al Mansoura": {
+      "aliases": [
+        "mansoura",
+        "al mansoura station"
+      ]
+    },
+    "Al Aziziyah": {
+      "aliases": [
+        "aziziyah",
+        "al aziziyah station"
+      ]
+    },
+    "Sport City": {
+      "aliases": [
+        "sport city station"
+      ]
+    },
+    "Al Waab": {
+      "aliases": [
+        "waab",
+        "al waab station"
+      ]
+    },
+    "Al Sudan": {
+      "aliases": [
+        "sudan",
+        "al sudan station"
+      ]
+    },
+    "Joaan": {
+      "aliases": [
+        "joaan station"
+      ]
+    },
+    "Al Sadd": {
+      "aliases": [
+        "sadd",
+        "al sadd station"
+      ]
+    },
+    "Bin Mahmoud": {
+      "aliases": [
+        "bin mahmoud station"
+      ]
+    },
+    "Souq Waqif": {
+      "aliases": [
+        "souq",
+        "souq waqif station"
+      ]
+    },
+    "National Museum": {
+      "aliases": [
+        "national museum station"
+      ]
+    },
+    "Ras Bu Aboud": {
+      "aliases": [
+        "ras abu aboud",
+        "ras bu abboud",
+        "ras bu aboud station"
+      ]
+    },
+    "Marina - South": {
+      "aliases": [
+        "lusail marina",
+        "lusail marina promenade",
+        "marina south",
+        "marina - south"
+      ]
+    },
+    "Marina - Central": {
+      "aliases": [
+        "marina central",
+        "marina - central"
+      ]
+    },
+    "Yacht Club": {
+      "aliases": [
+        "yacht club",
+        "lusail yacht club"
+      ]
+    },
+    "Marina - North": {
+      "aliases": [
+        "marina north",
+        "marina - north"
+      ]
+    },
+    "Tarfat - South": {
+      "aliases": [
+        "tarfat south"
+      ]
+    },
+    "Tarfat - North": {
+      "aliases": [
+        "tarfat north"
+      ]
+    },
+    "Wadi": {
+      "aliases": [
+        "wadi lusail"
+      ]
+    },
+    "Seef Lusail - South": {
+      "aliases": [
+        "seef lusail south"
+      ]
+    },
+    "Seef Lusail - North": {
+      "aliases": [
+        "seef lusail north"
       ]
     }
   },
-  "trams": {
-    "msheireb_tram": {
-      "type": "local downtown closed loop",
-      "aliases": ["msheireb tram", "mdd tram", "downtown tram"],
-      "stops": [
-        "Sahat Al Nakheel Station",
-        "Wadi Msheireb Station",
-        "Galleria Station",
-        "Msheireb Prayer Ground Station",
-        "Heritage Quarter Station",
-        "Al Baraha Station",
-        "Sahat Al Masjid Station",
-        "Al Kahraba Street Station",
-        "Al Mariah Street Station"
-      ],
-      "interchange_notes": [
-        "Wadi Msheireb is the practical link toward Msheireb Metro / downtown access.",
-        "Use this tram for local Msheireb Downtown movement, not cross-city travel."
-      ]
+  "edges": [
+    {
+      "from": "Lusail",
+      "to": "Qatar University",
+      "line": "Red Line",
+      "mode": "metro"
     },
-    "education_city_tram": {
-      "type": "campus tram network",
-      "aliases": ["education city tram", "qf tram", "qatar foundation tram", "ec tram"],
-      "known_metro_links": ["Education City Metro Station", "Qatar National Library Metro Station", "Al Shaqab Metro Station"],
-      "line_1_yellow_key_stops": [
-        "Al Shaqab Station",
-        "SouthNest",
-        "Oxygen Park Station",
-        "Education City Mosque",
-        "Al Khater House",
-        "Multaqa",
-        "2015",
-        "Ceremonial Gate",
-        "Qatar Academy East / North area"
-      ],
-      "line_2_blue_key_stops": [
-        "Mathaf",
-        "EC Stadium North",
-        "Academy Station",
-        "Education City Stadium East",
-        "Qatar Academy South",
-        "NorthNest",
-        "Qatar Academy East",
-        "Qatar Academy North"
-      ],
-      "line_3_grey_key_stops": [
-        "EC Community Housing 1",
-        "EC Community Housing 2",
-        "Researchery West",
-        "Researchery",
-        "Hotels",
-        "QNCC / QSTP",
-        "Sidra"
-      ],
-      "notes": [
-        "Use Education City Tram for Qatar Foundation campus movement after arriving by Green Line.",
-        "For QCRI / HBKU / Minaretein, walking may be exposed; combine tram, short walk, or taxi depending on heat and urgency."
-      ]
+    {
+      "from": "Qatar University",
+      "to": "Legtaifiya",
+      "line": "Red Line",
+      "mode": "metro"
     },
-    "lusail_tram": {
-      "type": "Lusail local tram network",
-      "aliases": ["lusail tram", "lusail lrt"],
-      "metro_links": ["Legtaifiya", "Lusail / Lusail QNB area"],
-      "orange_line_key_stops": [
-        "Legtaifiya",
-        "Marina - South",
-        "Marina - Central",
-        "Yacht Club",
-        "Marina - North",
-        "Tarfat - South",
-        "Al Wessil",
-        "Naifa",
-        "Fox Hills - South",
-        "Downtown Lusail",
-        "Al Khayl Street",
-        "Fox Hills - North",
-        "Crescent Park - North",
-        "Rawdat Lusail",
-        "Erkiyah",
-        "Lusail Stadium",
-        "Al Yasmeen"
-      ],
-      "pink_line_key_stops": [
-        "Legtaifiya",
-        "Marina - South",
-        "Marina - Central",
-        "Yacht Club",
-        "Marina - North",
-        "Tarfat - South",
-        "Tarfat - North",
-        "Wadi",
-        "Seef Lusail - South",
-        "Seef Lusail - North"
-      ],
-      "notes": [
-        "Legtaifiya is the important Red Line to Lusail Tram transfer.",
-        "Use Lusail Tram only after reaching Lusail/Legtaifiya area; it does not serve Education City or HIA."
-      ]
+    {
+      "from": "Legtaifiya",
+      "to": "Katara",
+      "line": "Red Line",
+      "mode": "metro"
+    },
+    {
+      "from": "Katara",
+      "to": "Al Qassar",
+      "line": "Red Line",
+      "mode": "metro"
+    },
+    {
+      "from": "Al Qassar",
+      "to": "DECC",
+      "line": "Red Line",
+      "mode": "metro"
+    },
+    {
+      "from": "DECC",
+      "to": "West Bay",
+      "line": "Red Line",
+      "mode": "metro"
+    },
+    {
+      "from": "West Bay",
+      "to": "Corniche",
+      "line": "Red Line",
+      "mode": "metro"
+    },
+    {
+      "from": "Corniche",
+      "to": "Al Bidda",
+      "line": "Red Line",
+      "mode": "metro"
+    },
+    {
+      "from": "Al Bidda",
+      "to": "Msheireb",
+      "line": "Red Line",
+      "mode": "metro"
+    },
+    {
+      "from": "Msheireb",
+      "to": "Al Doha Al Jadeeda",
+      "line": "Red Line",
+      "mode": "metro"
+    },
+    {
+      "from": "Al Doha Al Jadeeda",
+      "to": "Umm Ghuwailina",
+      "line": "Red Line",
+      "mode": "metro"
+    },
+    {
+      "from": "Umm Ghuwailina",
+      "to": "Al Matar Al Qadeem",
+      "line": "Red Line",
+      "mode": "metro"
+    },
+    {
+      "from": "Al Matar Al Qadeem",
+      "to": "Oqba Ibn Nafie",
+      "line": "Red Line",
+      "mode": "metro"
+    },
+    {
+      "from": "Oqba Ibn Nafie",
+      "to": "Hamad International Airport T1",
+      "line": "Red Line airport branch",
+      "mode": "metro"
+    },
+    {
+      "from": "Oqba Ibn Nafie",
+      "to": "Free Zone",
+      "line": "Red Line Al Wakra branch",
+      "mode": "metro"
+    },
+    {
+      "from": "Free Zone",
+      "to": "Ras Bu Fontas",
+      "line": "Red Line Al Wakra branch",
+      "mode": "metro"
+    },
+    {
+      "from": "Ras Bu Fontas",
+      "to": "Al Wakra",
+      "line": "Red Line Al Wakra branch",
+      "mode": "metro"
+    },
+    {
+      "from": "Al Riffa",
+      "to": "Education City",
+      "line": "Green Line",
+      "mode": "metro"
+    },
+    {
+      "from": "Education City",
+      "to": "Qatar National Library",
+      "line": "Green Line",
+      "mode": "metro"
+    },
+    {
+      "from": "Qatar National Library",
+      "to": "Al Shaqab",
+      "line": "Green Line",
+      "mode": "metro"
+    },
+    {
+      "from": "Al Shaqab",
+      "to": "Al Rayyan Al Qadeem",
+      "line": "Green Line",
+      "mode": "metro"
+    },
+    {
+      "from": "Al Rayyan Al Qadeem",
+      "to": "Al Messila",
+      "line": "Green Line",
+      "mode": "metro"
+    },
+    {
+      "from": "Al Messila",
+      "to": "Hamad Hospital",
+      "line": "Green Line",
+      "mode": "metro"
+    },
+    {
+      "from": "Hamad Hospital",
+      "to": "The White Palace",
+      "line": "Green Line",
+      "mode": "metro"
+    },
+    {
+      "from": "The White Palace",
+      "to": "Al Bidda",
+      "line": "Green Line",
+      "mode": "metro"
+    },
+    {
+      "from": "Al Bidda",
+      "to": "Msheireb",
+      "line": "Green Line",
+      "mode": "metro"
+    },
+    {
+      "from": "Msheireb",
+      "to": "Al Mansoura",
+      "line": "Green Line",
+      "mode": "metro"
+    },
+    {
+      "from": "Al Aziziyah",
+      "to": "Sport City",
+      "line": "Gold Line",
+      "mode": "metro"
+    },
+    {
+      "from": "Sport City",
+      "to": "Al Waab",
+      "line": "Gold Line",
+      "mode": "metro"
+    },
+    {
+      "from": "Al Waab",
+      "to": "Al Sudan",
+      "line": "Gold Line",
+      "mode": "metro"
+    },
+    {
+      "from": "Al Sudan",
+      "to": "Joaan",
+      "line": "Gold Line",
+      "mode": "metro"
+    },
+    {
+      "from": "Joaan",
+      "to": "Al Sadd",
+      "line": "Gold Line",
+      "mode": "metro"
+    },
+    {
+      "from": "Al Sadd",
+      "to": "Bin Mahmoud",
+      "line": "Gold Line",
+      "mode": "metro"
+    },
+    {
+      "from": "Bin Mahmoud",
+      "to": "Msheireb",
+      "line": "Gold Line",
+      "mode": "metro"
+    },
+    {
+      "from": "Msheireb",
+      "to": "Souq Waqif",
+      "line": "Gold Line",
+      "mode": "metro"
+    },
+    {
+      "from": "Souq Waqif",
+      "to": "National Museum",
+      "line": "Gold Line",
+      "mode": "metro"
+    },
+    {
+      "from": "National Museum",
+      "to": "Ras Bu Aboud",
+      "line": "Gold Line",
+      "mode": "metro"
+    },
+    {
+      "from": "Legtaifiya",
+      "to": "Marina - South",
+      "line": "Lusail Tram",
+      "mode": "tram"
+    },
+    {
+      "from": "Marina - South",
+      "to": "Marina - Central",
+      "line": "Lusail Tram",
+      "mode": "tram"
+    },
+    {
+      "from": "Marina - Central",
+      "to": "Yacht Club",
+      "line": "Lusail Tram",
+      "mode": "tram"
+    },
+    {
+      "from": "Yacht Club",
+      "to": "Marina - North",
+      "line": "Lusail Tram",
+      "mode": "tram"
+    },
+    {
+      "from": "Marina - North",
+      "to": "Tarfat - South",
+      "line": "Lusail Tram",
+      "mode": "tram"
+    },
+    {
+      "from": "Tarfat - South",
+      "to": "Tarfat - North",
+      "line": "Lusail Tram",
+      "mode": "tram"
+    },
+    {
+      "from": "Tarfat - North",
+      "to": "Wadi",
+      "line": "Lusail Tram",
+      "mode": "tram"
+    },
+    {
+      "from": "Wadi",
+      "to": "Seef Lusail - South",
+      "line": "Lusail Tram",
+      "mode": "tram"
+    },
+    {
+      "from": "Seef Lusail - South",
+      "to": "Seef Lusail - North",
+      "line": "Lusail Tram",
+      "mode": "tram"
     }
-  },
-  "aliases": {
-    "hia": "Hamad International Airport T1",
-    "hamad airport": "Hamad International Airport T1",
-    "hamad intl airport": "Hamad International Airport T1",
-    "hamad international airport": "Hamad International Airport T1",
-    "airport": "Hamad International Airport T1",
-    "ras bu funtas": "Ras Bu Fontas",
-    "ras bu fontas": "Ras Bu Fontas",
-    "oqba bin nafe": "Oqba Ibn Nafie",
-    "oqba ibn nafe": "Oqba Ibn Nafie",
-    "oqba ibn nafie": "Oqba Ibn Nafie",
-    "wakra": "Al Wakra",
-    "al wakra": "Al Wakra",
-    "qnl": "Qatar National Library",
-    "qatar national library": "Qatar National Library",
-    "qf": "Education City / Qatar Foundation",
-    "qatar foundation": "Education City / Qatar Foundation",
-    "qcri": "Qatar Computing Research Institute",
-    "hbku": "Hamad Bin Khalifa University"
-  },
-  "source_notes": [
-    "Seeded from Qatar Rail style metro/tram maps supplied during development, public Doha Metro/Lusail/Msheireb/Education City transit references, and local demo needs.",
-    "This file is not live schedule data; use web_search for opening hours, service disruptions, and official current notices."
   ]
 }

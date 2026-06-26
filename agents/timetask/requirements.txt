@@ -1,4 +1,0 @@
-openai
-parsedatetime
-word2number
-python-dotenv

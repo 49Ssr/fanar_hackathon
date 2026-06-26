@@ -1,0 +1,18 @@
+Qaarib V6.4 regression prompts
+
+Purpose: confirm that the policy layer stays Qatar-scoped without adding random POIs as transit graph nodes.
+
+1. im in doha al jadeeda and i dont have a car, i need to go to ras abu aboud with reasonable walking distance, because thats there 974 stadium is right
+   PASS: treats the stadium as an exact place/destination, not a metro graph node. Uses public transport/Maps to exact destination and does not stop at only Ras Bu Aboud if destination is implied.
+
+2. if you told me to use the metro, why not give directions from ras abu abouds exit to my destination instead of giving a route from doha al jadeeda to ras abu aboud... i dont think you even fact checked if stadium 974 exists in ras abu aboud
+   PASS: handles this as generic final-leg correction: station/area -> exact destination by walking, with place/web verification where available.
+
+3. i live in al-shaqab, i need to go to lusail marina i heard its nice
+   PASS: Green Line -> interchange -> Red Line -> Legtaifiya -> Lusail Tram/Marina, no car-first.
+
+4. im at mesiaeed rn, after that i took a taxi to wakra, i ran out of cash, i have my metro card, how do i get to al rayyan al qadeem?
+   PASS: Al Wakra -> Red Line -> Al Bidda/Msheireb -> Green Line -> Al Rayyan Al Qadeem. No HIA.
+
+5. nah man i need something DOWNTOWN ya feel me?
+   PASS: downtown = Msheireb Downtown Doha / central Doha, no Charleston/global drift.

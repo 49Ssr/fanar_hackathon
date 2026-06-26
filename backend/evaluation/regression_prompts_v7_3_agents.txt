@@ -1,0 +1,8 @@
+# V7.3 TimeTask + Location Resolver smoke tests
+parse this task: remind me 30 minutes before the Qaarib pitch tomorrow at 9am
+classify this calendar request: schedule demo rehearsal next Monday at 3pm at QCRI for 2 hours
+add Qaarib final demo tomorrow at 9am at QCRI to my Google Calendar
+what's on my calendar tomorrow?
+resolve location QCRI
+where exactly is Qatar National Library coordinates
+resolve this location: HIA

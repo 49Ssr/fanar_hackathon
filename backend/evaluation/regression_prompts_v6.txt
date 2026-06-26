@@ -1,0 +1,62 @@
+Qaarib v6 regression prompts
+============================
+
+Run these manually after every backend change.
+
+1. i live in al-shaqab, i need to go to lusail marina i heard its nice
+PASS: route_plan only; route query by public transport; answer mentions Green Line -> Al Bidda -> Red Line -> Legtaifiya -> Lusail Tram/Marina. No car-first.
+
+2. i dont have a car habibi
+PASS: preserves previous Al Shaqab -> Lusail Marina route; public transport; no Uber-first.
+
+3. i think theres a way of travel you missed
+PASS: treats as public transport correction; no HIA; no bus hallucination.
+
+4. im at mesiaeed rn, just finished a safari journey, after that i took a taxi to wakra... but i ran out of cash... man i need to get to al rayyan al qadeem... oh i have my metro card! but how do i get there?
+PASS: origin Al Wakra, destination Al Rayyan Al Qadeem. Route: Red Line -> Al Bidda -> Green Line. No HIA. No Umm Ghuwailina. No taxi-first.
+
+5. im in mansoura and i want to go and find a place to drink and party in qatar... im a british expat
+PASS: place_lookup query is licensed hotel bar/lounge near Al Mansoura/Doha. No non-Qatar results.
+
+6. nah man i need something DOWNTOWN ya feel me?
+PASS: downtown means Msheireb Downtown Doha. No Charleston/Dubai/global results.
+
+7. i need qahwa and dates near msheireb rn
+PASS: place_lookup + maybe web_search; no unsupported claim that a cafe definitely serves dates unless tool confirms.
+
+8. which one is budget friendly?
+PASS: preserves qahwa/dates/cafe context and Msheireb location; says price unconfirmed unless price_level exists.
+
+9. how do i get from QCRI to minaretein without sweating like a fountain outside?
+PASS: route_plan by car/taxi; heat-aware; no long walk as main answer.
+
+10. im at ras bu funtas and need to get to HIA T1 by metro
+PASS: transit route through Red Line branch context. HIA is a graph node, not a cursed special-case router.
+
+Hard fail conditions:
+- Any non-Qatar city appears in a recommendation.
+- Any transit/card/no-car prompt gets car/taxi as main answer when graph path exists.
+- HIA appears when prompt is not about HIA.
+- Fanar invents schedules, menus, prices, facilities, or legal claims.
+
+# Language/scope recovery regression
+la hawla wala quwatah illa billah
+i speak english akhi
+
+--- V6.2 EXTRA REGRESSIONS ---
+can you do what competing LLMs can?
+where does your name come from
+la hawla wala quwatah illa billah
+i speak english akhi
+
+# Should NOT trigger previous place/route context:
+<blank prompt>
+
+# Resort / summer:
+i want to check out anatara resorts... is it even a nice experience for summer?
+
+# Photo spots:
+man i really want to view some places in qatar where i can take amazing photos, pls can you help
+
+# Follow-up after photo spots should not resurrect nightlife:
+what about somewhere more downtown for photos?

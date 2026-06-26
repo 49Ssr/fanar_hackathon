@@ -3,6 +3,14 @@
 *.env
 backend/.env
 backend/*.env
+backend/google_credentials.json
+backend/google_calendar_token.json
+backend/token.json
+credentials.json
+token.json
+
+# Generated user/demo files
+backend/generated_calendar/
 
 # Virtual environments
 .venv/

@@ -1,0 +1,11 @@
+# Qaarib V7.2 food/local-scope regression prompts
+
+madarchod
+
+i want to eat something from outside... whats your recommendation. im feelin' lucky today so choose whatever, and guide me there
+
+im in mansoura and i want to eat something from outside, choose whatever and guide me there
+
+i want food near me
+
+recommend a restaurant near msheireb and guide me there
