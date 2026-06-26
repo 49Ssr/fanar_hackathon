@@ -24,11 +24,135 @@
 
     body {
       font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
-      background: var(--bg);
+      background: #0d0d0d;
       color: var(--text);
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* ── Intro layers ── */
+    #hero-layer {
+      position: fixed;
+      inset: 0;
+      z-index: 10;
+      background-color: #0d0d0d;
+      overflow: visible;
+      transition: transform 900ms ease, opacity 900ms ease;
+    }
+
+#gradient-layer {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 60%;
+      z-index: 11;
+      background: linear-gradient(to bottom, transparent, #061829);
+      opacity: 0.6;
+      transition: opacity 900ms ease;
+    }
+
+    #intro-ui {
+      position: fixed;
+      inset: 0;
+      z-index: 12;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: opacity 400ms ease, transform 400ms ease;
+    }
+
+/* ── Chat UI wrapper ── */
+    #chat-ui::before {
+      content: '';
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 80px;
+      background: linear-gradient(to bottom, #0d0d0d, transparent);
+      z-index: 30;
+      pointer-events: none;
+    }
+
+    #chat-ui {
+      position: fixed;
+      inset: 0;
+      z-index: 20;
+      opacity: 1;
+      pointer-events: all;
+      background: #0d0d0d;
       display: flex;
       height: 100vh;
-      overflow: hidden;
+      box-shadow: 0 -20px 40px #0d0d0d;
+      transition: opacity 500ms ease;
+    }
+
+    /* Intro hidden by default; shown when entering is removed */
+    body:not(.showing-intro):not(.underwater) #hero-layer,
+    body:not(.showing-intro):not(.underwater) #gradient-layer,
+    body:not(.showing-intro):not(.underwater) #intro-ui,
+    body:not(.showing-intro):not(.underwater) #water-overlay {
+      display: none;
+    }
+
+    body.showing-intro #chat-ui {
+      opacity: 0;
+      pointer-events: none;
+      z-index: 5;
+    }
+
+    /* ── Intro visible state ── */
+    body.showing-intro #hero-layer {
+      transform: translateY(0);
+      opacity: 1;
+      transition: transform 900ms ease, opacity 900ms ease;
+    }
+
+    body.showing-intro #gradient-layer {
+      opacity: 0.6;
+      transition: opacity 900ms ease;
+    }
+
+    body.showing-intro #intro-ui {
+      opacity: 1;
+      transform: translateY(0);
+      pointer-events: auto;
+      transition: opacity 400ms ease, transform 400ms ease;
+    }
+
+    /* ── Underwater (intro → chat) transition ── */
+    #water-overlay {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 15;
+      background: #0d0d0d;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 1000ms ease 800ms;
+    }
+
+
+    body.underwater #intro-ui {
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 400ms ease;
+    }
+
+    body.darkening #water-overlay {
+      opacity: 1;
+      transition: opacity 800ms ease-in;
+    }
+
+
+    @media (prefers-reduced-motion: reduce) {
+      body.showing-intro #hero-layer,
+      body.showing-intro #intro-ui,
+      body.underwater #hero-layer { transform: none; }
     }
 
     /* ── Hamburger ── */
@@ -596,6 +720,26 @@
 
 <body>
 
+<!-- Layer 1: hero visual -->
+<div id="hero-layer">
+  <video autoplay loop muted playsinline style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center 30%;transform:scale(1.8);">
+    <source src="UI_video/0001-0190.mp4">
+  </video>
+</div>
+
+<!-- Layer 2: bottom gradient overlay -->
+<div id="gradient-layer"></div>
+
+<!-- Layer 3: intro UI -->
+<div id="intro-ui">
+</div>
+
+<!-- Water overlay (used during underwater transition) -->
+<div id="water-overlay"></div>
+
+<!-- Layer 4: chat UI -->
+<div id="chat-ui">
+
 <!-- User avatar + dropdown -->
 <div style="position:fixed;top:12px;right:16px;z-index:300;">
   <div id="avatarBtn" onclick="toggleAvatarMenu(event)" style="width:38px;height:38px;border-radius:50%;overflow:hidden;border:2px solid #333;cursor:pointer;">
@@ -618,6 +762,7 @@
 <button class="hamburger" id="hamburger" onclick="toggleSidebar()" aria-label="Toggle menu">
   <span></span><span></span><span></span>
 </button>
+<span id="tool-title" style="font-size:17px;font-weight:600;color:white;margin-left:16px;display:none;position:fixed;top:20px;left:68px;z-index:300;"></span>
 
 <!-- Sidebar backdrop -->
 <div class="sidebar-backdrop" id="backdrop" onclick="closeSidebar()"></div>
@@ -632,6 +777,9 @@
 
   <div class="sidebar-section-label" style="text-transform:none;">Tools</div>
 
+  <button class="sidebar-btn" id="qaaribToolBtn">
+    <span class="tool-icon">⛵</span> Qaarib
+  </button>
   <button class="sidebar-btn">
     <span class="tool-icon">🗓</span> Events & Exhibitions
   </button>
@@ -665,6 +813,7 @@
   <div class="hero" id="hero">
     <img src="rqtnbrel.png" style="width:120px; opacity:0.6; display:block; margin: 0 auto 24px;">
     <p class="hero-sub"><img src="fanar-badge-charcoal.svg" style="width:28px; vertical-align:middle; margin-right:8px;"><strong>How can I help you?</strong></p>
+    <div id="welcome-msg" style="font-size:32px;font-weight:700;color:white;margin-top:8px;display:none;">Welcome to Qaarib</div>
   </div>
 
   <!-- Messages -->
@@ -845,6 +994,64 @@
     input.value = '';
     input.focus();
   }
+
+  var introTimer = null;
+
+  function triggerUnderwater() {
+    var chatUI = document.getElementById('chat-ui');
+    var waterOverlay = document.getElementById('water-overlay');
+    document.body.classList.add('underwater');
+    var vid = document.querySelector('#hero-layer video');
+    if (vid) {
+      vid.style.transition = 'object-position 2500ms ease-in';
+      vid.style.objectPosition = 'center 200%';
+    }
+    setTimeout(function () {
+      waterOverlay.style.transition = 'opacity 800ms ease-in';
+      waterOverlay.style.opacity = '1';
+    }, 1000);
+    setTimeout(function () {
+      chatUI.style.transition = 'none';
+      chatUI.style.transform = 'translateY(100vh)';
+      chatUI.style.opacity = '1';
+      chatUI.style.zIndex = '25';
+      chatUI.style.pointerEvents = 'all';
+      setTimeout(function () {
+        chatUI.style.transition = 'transform 600ms ease-out';
+        chatUI.style.transform = 'translateY(0)';
+      }, 50);
+    }, 2500);
+    setTimeout(function () {
+      document.body.classList.remove('showing-intro', 'underwater');
+      waterOverlay.style.transition = 'none';
+      waterOverlay.style.opacity = '0';
+    }, 4000);
+  }
+
+  function showIntro() {
+    var vid = document.querySelector('#hero-layer video');
+    var waterOverlay = document.getElementById('water-overlay');
+    document.body.classList.remove('underwater');
+    document.body.classList.add('showing-intro');
+    if (vid) { vid.currentTime = 0; vid.play(); vid.playbackRate = 1; }
+    waterOverlay.style.transition = '';
+    waterOverlay.style.opacity = '0';
+    clearTimeout(introTimer);
+    introTimer = setTimeout(triggerUnderwater, 3000);
+  }
+
+  // Qaarib tool button — show intro screen, auto-enter after 3s
+  document.getElementById('qaaribToolBtn').addEventListener('click', function () {
+    showIntro();
+    closeSidebar();
+    document.getElementById('tool-title').textContent = 'Qaarib';
+    document.getElementById('tool-title').style.display = 'inline';
+    document.getElementById('welcome-msg').style.display = 'block';
+  });
+
+  document.getElementById('chat-ui').style.pointerEvents = 'all';
 </script>
+
+</div><!-- /#chat-ui -->
 </body>
 </html>
