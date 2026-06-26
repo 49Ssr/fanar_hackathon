@@ -10,6 +10,16 @@ load_dotenv(BASE_DIR / ".env")
 load_dotenv()
 TZ = ZoneInfo("Asia/Qatar")
 
+TIMEZONE_ALIASES = {
+    "qatar": ZoneInfo("Asia/Qatar"),
+    "doha": ZoneInfo("Asia/Qatar"),
+    "qa": ZoneInfo("Asia/Qatar"),
+    "belfast": ZoneInfo("Europe/London"),
+    "london": ZoneInfo("Europe/London"),
+    "uk": ZoneInfo("Europe/London"),
+    "utc": ZoneInfo("UTC"),
+}
+
 
 def _context():
     now = datetime.now(TZ)
@@ -18,6 +28,106 @@ def _context():
         "reference_day": now.strftime("%A"),
         "reference_time": now.time().replace(microsecond=0).isoformat(),
     }
+
+
+def _clean(text):
+    return re.sub(r"\s+", " ", (text or "").lower().strip())
+
+
+def _display_dt(dt):
+    return dt.strftime("%a %d %b %Y, %-I:%M %p") if os.name != "nt" else dt.strftime("%a %d %b %Y, %#I:%M %p")
+
+
+def _display_time(dt):
+    return dt.strftime("%-I:%M %p") if os.name != "nt" else dt.strftime("%#I:%M %p")
+
+
+def _infer_timezone(text):
+    for key, zone in TIMEZONE_ALIASES.items():
+        if re.search(rf"\b{re.escape(key)}\b", text):
+            return zone, key.title() if key != "qa" else "Qatar"
+    return TZ, "Qatar"
+
+
+def _parse_relative_delta(text):
+    """Parse simple arithmetic like '136 hours and 32 minutes from now'."""
+    total = timedelta(0)
+    matched = False
+
+    patterns = [
+        (r"(\d+(?:\.\d+)?)\s*(weeks?|w)\b", "weeks"),
+        (r"(\d+(?:\.\d+)?)\s*(days?|d)\b", "days"),
+        (r"(\d+(?:\.\d+)?)\s*(hours?|hrs?|h)\b", "hours"),
+        (r"(\d+(?:\.\d+)?)\s*(minutes?|mins?|m)\b", "minutes"),
+    ]
+    for pattern, unit in patterns:
+        for m in re.finditer(pattern, text):
+            value = float(m.group(1))
+            total += timedelta(**{unit: value})
+            matched = True
+
+    return total if matched else None
+
+
+def _direct_time_answer(query):
+    """Handle pure clock/datetime math locally.
+
+    TimeTask is an agent for task/calendar slot extraction. It should not spend
+    ten seconds trying to parse 'what time is it' or exact timedelta arithmetic.
+    """
+    text = _clean(query)
+    if not text:
+        return None
+
+    zone, label = _infer_timezone(text)
+    now = datetime.now(zone)
+
+    current_time_phrases = [
+        "what time is it", "time is it", "current time", "time right now",
+        "time now", "right now", "what's the time", "whats the time",
+    ]
+    asks_time = any(p in text for p in current_time_phrases)
+    if asks_time and not any(w in text for w in ["from now", "after", "in exactly", "exactly"]):
+        final = f"It is {_display_time(now)} in {label} right now ({now.strftime('%A, %d %B %Y')})."
+        return {
+            "title": "Current time",
+            "intent": "time_lookup",
+            "timezone": str(zone),
+            "datetime": now.isoformat(),
+            "summary": final,
+            "final_answer": final,
+        }
+
+    if any(p in text for p in ["from now", "after now", "later", "exact date and time", "exactly"]):
+        delta = _parse_relative_delta(text)
+        if delta is not None and delta.total_seconds() >= 0:
+            target = now + delta
+            final = (
+                f"Exactly {str(delta).replace(' days,', ' days and')} from now is "
+                f"{_display_dt(target)} in {label}."
+            )
+            return {
+                "title": "Relative time calculation",
+                "intent": "time_calculation",
+                "timezone": str(zone),
+                "reference_datetime": now.isoformat(),
+                "target_datetime": target.isoformat(),
+                "summary": final,
+                "final_answer": final,
+            }
+
+    if any(p in text for p in ["what date is it", "date today", "today's date", "todays date"]):
+        final = f"Today is {now.strftime('%A, %d %B %Y')} in {label}."
+        return {
+            "title": "Current date",
+            "intent": "date_lookup",
+            "timezone": str(zone),
+            "datetime": now.isoformat(),
+            "summary": final,
+            "final_answer": final,
+        }
+
+    return None
 
 
 def _load_agent_run():
@@ -45,6 +155,15 @@ def _parse_duration_to_timedelta(value):
 
 
 def parse_timetask(query):
+    direct = _direct_time_answer(query)
+    if direct:
+        return {
+            "intent": direct.get("intent"),
+            "sub_intent": "Direct deterministic time answer",
+            "slots": direct,
+            "direct_answer": direct.get("final_answer"),
+        }
+
     run, err = _load_agent_run()
     if not run:
         return {"intent": None, "sub_intent": None, "slots": {}, "error": f"TimeTask agent unavailable: {err}"}
@@ -99,6 +218,9 @@ def calendar_parse_from_timetask(query, tz=TZ, location_aliases=None):
 
 
 def _friendly_summary(result):
+    if result.get("direct_answer"):
+        return result.get("direct_answer")
+
     intent = result.get("intent") or "Unknown"
     sub = result.get("sub_intent") or "Unclassified"
     slots = result.get("slots") or {}
@@ -112,6 +234,10 @@ def _friendly_summary(result):
 
 
 def time_task(query, num_results=1):
+    direct = _direct_time_answer(query)
+    if direct:
+        return [direct]
+
     result = parse_timetask(query)
     final = _friendly_summary(result)
     return [{
