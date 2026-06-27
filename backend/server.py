@@ -50,12 +50,52 @@ Do not say "I understand" or "let me know if you need anything else".
 Prefer: "Best move:", "Easy one:", "Heads up:", "Worth checking:".
 Stay Qatar-local. Do not mention provider failover, APIs, backend issues, or internal routing.
 
+Hard Qatar transit facts:
+- QCRI/HBKU is in Education City.
+- Education City access is on the Green Line, especially Qatar National Library / Education City stations depending exact building and entrance.
+- QCRI is not on the Red Line or Gold Line.
+- Legtaifiya is on the Red Line and links to Lusail Tram; it is not on the Green Line.
+- DECC is on the Red Line, not the Education City/QCRI stop.
+- If corrected by the user, do not invent bus routes or new stations. Lock to known facts or ask to verify.
+
 Recent context:
 {recent if recent else "No previous context."}
 
 User: {user_prompt}
 Qaarib:
 """.strip()
+
+
+def _qcri_answer(user_prompt, history=""):
+    text = _clean(user_prompt)
+    h = _clean(history)
+    qcri_context = any(x in text or x in h[-2500:] for x in ["qcri", "hbku", "education city", "qatar computing research institute"])
+    correction = any(x in text for x in ["wrong", "not on", "wtf", "no", "incorrect", "again"])
+
+    if any(x in text for x in ["where qcri", "where is qcri", "do you know where qcri", "hbku qcri", "qatar computing research institute"]):
+        return (
+            "Yes — QCRI is in Education City, within HBKU/Qatar Foundation.\n"
+            "Metro-wise, think Green Line: Qatar National Library or Education City station, depending which entrance/building you’re using.\n"
+            "Not Red Line, not Gold Line."
+        )
+
+    if qcri_context and correction:
+        return (
+            "Fair — lock this in: QCRI/HBKU is Education City.\n"
+            "Use the Green Line side: Qatar National Library / Education City area.\n"
+            "Not Red Line, not Gold Line, not Legtaifiya, and not DECC. I shouldn’t have guessed bus routes there."
+        )
+
+    return None
+
+
+def _smalltalk_answer(user_prompt):
+    text = _clean(user_prompt)
+    if any(x in text for x in ["how are u", "how are you", "how r u", "how you doing", "how u doing"]):
+        return "Alhamdulillah, doing good. What’s the move — route, place, event, or something Qatar-local?"
+    if text in {"do you know where i am", "where am i", "can you tell where i am"}:
+        return "Not exactly — I don’t get your live location unless you tell me. Drop the area or landmark and I’ll work from there."
+    return None
 
 
 def _extended_greeting_answer(user_prompt):
@@ -182,12 +222,12 @@ def chat():
     try:
         history_before_turn = load_history()
 
-        greeting = _extended_greeting_answer(user_prompt)
-        if greeting:
-            router_data = {"tools": [], "queries": {}, "reason": "local_extended_greeting", "confidence": 1.0, "direct_answer": greeting}
+        direct = _qcri_answer(user_prompt, history_before_turn) or _smalltalk_answer(user_prompt) or _extended_greeting_answer(user_prompt)
+        if direct:
+            router_data = {"tools": [], "queries": {}, "reason": "local_direct_answer", "confidence": 1.0, "direct_answer": direct}
             append_router_decision(router_data)
-            append_turn(user_prompt, greeting)
-            return jsonify({"response": greeting, "router": router_data,
+            append_turn(user_prompt, direct)
+            return jsonify({"response": direct, "router": router_data,
                             "timing": {"router_ms": 0, "tool_ms": 0, "responder_ms": 0}})
 
         pre = get_pre_router_plan(user_prompt, history_before_turn)
