@@ -10,16 +10,14 @@
   var auraVoiceMode = false;
   var auraPlaybackRate = 0.68;
   var lastAudioUrl = null;
-  var micStream = null;
-  var audioCtx = null;
-  var analyser = null;
-  var meterTimer = null;
+  var recordStartedAt = 0;
+  var statusTimer = null;
 
   function apiBase() { return window.QAARIB_API_BASE || 'http://localhost:5000'; }
   function el(id) { return document.getElementById(id); }
 
   function status(msg) {
-    console.log('[Qaarib voice/location]', msg);
+    console.log('[Qaarib voice]', msg);
     var pill = el('qaaribVoiceStatus');
     if (pill) pill.textContent = msg || '';
   }
@@ -29,17 +27,17 @@
     var s = document.createElement('style');
     s.id = 'qaaribVoiceStyles';
     s.textContent = '' +
-      '#qaaribVoicePill{position:fixed;left:50%;bottom:92px;transform:translateX(-50%);z-index:460;background:rgba(13,13,13,.94);border:1px solid #2a2a2a;border-radius:999px;padding:9px 14px;color:#f0ece3;font:12px system-ui,-apple-system,Segoe UI,sans-serif;display:none;align-items:center;gap:10px;box-shadow:0 10px 32px rgba(0,0,0,.45)}' +
-      '#qaaribVoiceDot{width:8px;height:8px;border-radius:50%;background:#777;box-shadow:none}' +
-      '#qaaribVoicePill.listening #qaaribVoiceDot{background:#d04b4b;box-shadow:0 0 14px rgba(208,75,75,.9)}' +
-      '#qaaribVoiceMeter{width:72px;height:4px;background:#202020;border-radius:999px;overflow:hidden}' +
-      '#qaaribVoiceMeterFill{height:100%;width:0%;background:#c9a84c;border-radius:999px;transition:width .08s linear}' +
+      '#qaaribVoicePill{position:fixed;left:50%;bottom:92px;transform:translateX(-50%);z-index:460;background:rgba(13,13,13,.96);border:1px solid #2a2a2a;border-radius:999px;padding:9px 14px;color:#f0ece3;font:12px system-ui,-apple-system,Segoe UI,sans-serif;display:none;align-items:center;gap:10px;box-shadow:0 10px 32px rgba(0,0,0,.45)}' +
+      '#qaaribVoiceDot{width:8px;height:8px;border-radius:50%;background:#777}' +
+      '#qaaribVoicePill.listening #qaaribVoiceDot{background:#c9a84c;animation:qaaribPulse 900ms ease-in-out infinite;box-shadow:0 0 16px rgba(201,168,76,.9)}' +
+      '@keyframes qaaribPulse{0%,100%{transform:scale(1);opacity:.7}50%{transform:scale(1.55);opacity:1}}' +
+      '#qaaribVoiceTimer{color:#888;font-variant-numeric:tabular-nums}' +
       '#qaaribVoicePanel{position:fixed;right:18px;bottom:92px;z-index:450;background:rgba(13,13,13,.97);border:1px solid #2a2a2a;border-radius:12px;padding:12px;width:min(320px,calc(100vw - 32px));color:#f0ece3;font:13px system-ui,-apple-system,Segoe UI,sans-serif;box-shadow:0 12px 38px rgba(0,0,0,.55);display:none}' +
       '#qaaribVoicePanel select,#qaaribVoicePanel button{width:100%;background:#111;color:#f0ece3;border:1px solid #2a2a2a;border-radius:8px;padding:8px;margin:4px 0 10px;font:13px system-ui,-apple-system,Segoe UI,sans-serif}' +
       '#qaaribVoicePanel button{background:#1a1a1a;cursor:pointer}' +
       '#qaaribVoicePanel label{font-size:11px;color:#888;display:block;margin-top:4px}' +
       '#qaaribVoicePanel .close{width:auto;border:0;background:transparent;color:#888;margin:0;padding:0 4px;font-size:18px}' +
-      '.input-action.qaarib-recording{background:#2a1515!important;color:#fff!important;border-color:#5f2d2d!important}';
+      '.input-action.qaarib-recording{background:#2a2112!important;color:#fff!important;border-color:#66562a!important}';
     document.head.appendChild(s);
   }
 
@@ -48,7 +46,7 @@
     if (!el('qaaribVoicePill')) {
       var pill = document.createElement('div');
       pill.id = 'qaaribVoicePill';
-      pill.innerHTML = '<span id="qaaribVoiceDot"></span><span id="qaaribVoiceStatus">ready</span><span id="qaaribVoiceMeter"><span id="qaaribVoiceMeterFill"></span></span>';
+      pill.innerHTML = '<span id="qaaribVoiceDot"></span><span id="qaaribVoiceStatus">ready</span><span id="qaaribVoiceTimer">00:00</span>';
       document.body.appendChild(pill);
     }
     if (!el('qaaribVoicePanel')) {
@@ -56,15 +54,15 @@
       panel.id = 'qaaribVoicePanel';
       panel.innerHTML = '' +
         '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><b style="font-size:13px">Voice settings</b><button class="close" id="qaaribCloseVoicePanel">×</button></div>' +
-        '<label>Microphone</label><select id="qaaribMicSelect"><option value="default">Device default</option></select>' +
+        '<label>Microphone permission / browser input</label><select id="qaaribMicSelect"><option value="default">Device default</option></select>' +
         '<label>Speaker</label><select id="qaaribSpeakerSelect"><option value="default">Device default</option></select>' +
-        '<label>Aura speed</label><select id="qaaribSpeedSelect"><option value="0.62">Very slow</option><option value="0.68" selected>Slow</option><option value="0.76">Natural</option><option value="0.88">Faster</option></select>' +
+        '<label>Aura speed</label><select id="qaaribSpeedSelect"><option value="0.60">Very slow</option><option value="0.68" selected>Slow</option><option value="0.76">Natural</option><option value="0.88">Faster</option></select>' +
         '<button id="qaaribRefreshDevices">Refresh devices</button>' +
-        '<div style="font-size:11px;color:#777;line-height:1.4">Click 🎙 to start, click ■ to stop and send. The gold bar confirms the selected mic is hearing sound. Speaker selection works best in Chrome/Edge.</div>';
+        '<div style="font-size:11px;color:#777;line-height:1.4">Click 🎙 once, speak, then click ■ to stop and send. Browser speech recognition uses its own mic path, so set your mic as OS default for the safest demo.</div>';
       document.body.appendChild(panel);
       el('qaaribCloseVoicePanel').onclick = function () { panel.style.display = 'none'; };
       el('qaaribRefreshDevices').onclick = function () { enumerateDevices(true); };
-      el('qaaribMicSelect').onchange = function (e) { selectedMicId = e.target.value || 'default'; stopMicMonitor(); startMicMonitor(); };
+      el('qaaribMicSelect').onchange = function (e) { selectedMicId = e.target.value || 'default'; primeMicPermission(); };
       el('qaaribSpeakerSelect').onchange = function (e) { selectedSpeakerId = e.target.value || 'default'; };
       el('qaaribSpeedSelect').onchange = function (e) { auraPlaybackRate = parseFloat(e.target.value || '0.68'); };
     }
@@ -78,7 +76,7 @@
 
   function setListeningUI(active) {
     var btn = document.querySelector('.input-action[title="Voice"], .input-action[title="Stop recording"]');
-    showPill(active || !!(el('qaaribVoiceStatus') && el('qaaribVoiceStatus').textContent));
+    showPill(true);
     if (btn) {
       btn.textContent = active ? '■' : '🎙';
       btn.title = active ? 'Stop recording' : 'Voice';
@@ -88,6 +86,21 @@
     if (pill) pill.classList.toggle('listening', active);
   }
 
+  function startTimer() {
+    recordStartedAt = Date.now();
+    if (statusTimer) clearInterval(statusTimer);
+    statusTimer = setInterval(function () {
+      var t = Math.floor((Date.now() - recordStartedAt) / 1000);
+      var timer = el('qaaribVoiceTimer');
+      if (timer) timer.textContent = String(Math.floor(t / 60)).padStart(2, '0') + ':' + String(t % 60).padStart(2, '0');
+    }, 250);
+  }
+
+  function stopTimer() {
+    if (statusTimer) clearInterval(statusTimer);
+    statusTimer = null;
+  }
+
   function micConstraints() {
     if (selectedMicId && selectedMicId !== 'default') {
       return { audio: { deviceId: { exact: selectedMicId }, echoCancellation: true, noiseSuppression: true, autoGainControl: true } };
@@ -95,51 +108,22 @@
     return { audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } };
   }
 
-  function stopMicMonitor() {
-    if (meterTimer) clearInterval(meterTimer);
-    meterTimer = null;
-    if (micStream) micStream.getTracks().forEach(function (t) { t.stop(); });
-    micStream = null;
-    var fill = el('qaaribVoiceMeterFill');
-    if (fill) fill.style.width = '0%';
-  }
-
-  function startMicMonitor() {
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      status('mic not supported');
-      return Promise.resolve(false);
-    }
-    stopMicMonitor();
+  function primeMicPermission() {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return Promise.resolve(false);
     return navigator.mediaDevices.getUserMedia(micConstraints()).then(function (stream) {
-      micStream = stream;
-      audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
-      if (audioCtx.state === 'suspended') audioCtx.resume().catch(function () {});
-      analyser = audioCtx.createAnalyser();
-      analyser.fftSize = 256;
-      var source = audioCtx.createMediaStreamSource(stream);
-      source.connect(analyser);
-      var data = new Uint8Array(analyser.frequencyBinCount);
-      meterTimer = setInterval(function () {
-        if (!analyser) return;
-        analyser.getByteFrequencyData(data);
-        var sum = 0;
-        for (var i = 0; i < data.length; i++) sum += data[i];
-        var level = Math.min(100, Math.round((sum / data.length) * 1.8));
-        var fill = el('qaaribVoiceMeterFill');
-        if (fill) fill.style.width = level + '%';
-      }, 90);
-      status('mic live — speak now');
+      stream.getTracks().forEach(function (t) { t.stop(); });
+      status('mic permission ready');
       enumerateDevices(false);
       return true;
     }).catch(function () {
-      status('mic blocked or unavailable');
+      status('mic permission blocked');
       return false;
     });
   }
 
   function enumerateDevices(forcePermission) {
     ensureUI();
-    var p = forcePermission ? startMicMonitor() : Promise.resolve(true);
+    var p = forcePermission ? primeMicPermission() : Promise.resolve(true);
     return p.then(function () {
       if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) return;
       return navigator.mediaDevices.enumerateDevices().then(function (devices) {
@@ -153,10 +137,14 @@
         devices.forEach(function (d) {
           if (d.kind === 'audioinput') {
             var o = document.createElement('option');
-            o.value = d.deviceId; o.textContent = d.label || ('Microphone ' + mi++); mic.appendChild(o);
+            o.value = d.deviceId;
+            o.textContent = d.label || ('Microphone ' + mi++);
+            mic.appendChild(o);
           } else if (d.kind === 'audiooutput') {
             var p = document.createElement('option');
-            p.value = d.deviceId; p.textContent = d.label || ('Speaker ' + si++); spk.appendChild(p);
+            p.value = d.deviceId;
+            p.textContent = d.label || ('Speaker ' + si++);
+            spk.appendChild(p);
           }
         });
         mic.value = oldMic;
@@ -179,16 +167,17 @@
     var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) return null;
     var rec = new SpeechRecognition();
-    rec.lang = 'en-QA';
+    rec.lang = 'en-US';
     rec.interimResults = true;
     rec.continuous = true;
     rec.maxAlternatives = 1;
     rec.onstart = function () {
       isListening = true;
       setListeningUI(true);
+      startTimer();
       status('listening — speak now');
     };
-    rec.onaudiostart = function () { status('mic audio detected'); };
+    rec.onaudiostart = function () { status('mic opened by browser'); };
     rec.onspeechstart = function () { status('speech detected'); };
     rec.onresult = function (event) {
       interimTranscript = '';
@@ -206,27 +195,20 @@
       status('speech engine: ' + (event.error || 'error'));
     };
     rec.onend = function () {
-      if (isListening && !manualStop) {
-        status('speech engine restarted');
-        setTimeout(function () {
-          try { rec.start(); } catch (e) {}
-        }, 220);
-        return;
-      }
       isListening = false;
       setListeningUI(false);
+      stopTimer();
       var input = el('chatInput');
       var text = ((finalTranscript + interimTranscript).trim() || (input ? input.value.trim() : ''));
-      stopMicMonitor();
       if (manualStop && input && text) {
         input.value = text;
         auraVoiceMode = true;
         status('voice captured — sending');
         if (typeof window.sendMessage === 'function') window.sendMessage();
       } else if (manualStop) {
-        status('nothing transcribed — try Chrome/Edge or type it');
+        status('nothing transcribed — type or try Chrome/Edge');
       } else {
-        status('voice stopped');
+        status('speech engine stopped — click mic again');
       }
       if (input) input.placeholder = 'Ask Qaarib anything…';
     };
@@ -243,15 +225,16 @@
     var input = el('chatInput');
     if (input) { input.value = ''; input.placeholder = 'Listening… click ■ to stop'; }
     requestLocation();
-    startMicMonitor().then(function () {
-      recognition = recognition || setupRecognition();
+    status('starting mic...');
+    primeMicPermission().then(function () {
+      recognition = setupRecognition();
       if (!recognition) {
-        status('browser speech recognition unsupported — Chrome/Edge recommended');
+        status('speech recognition unsupported — use Chrome/Edge');
         setListeningUI(false);
         return;
       }
       try { recognition.start(); }
-      catch (e) { status('speech engine already active'); }
+      catch (e) { status('speech engine busy — click again'); }
     });
   }
 
@@ -262,7 +245,7 @@
     catch (e) {
       isListening = false;
       setListeningUI(false);
-      stopMicMonitor();
+      stopTimer();
       status('stopped');
     }
   }
