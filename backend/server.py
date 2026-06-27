@@ -33,18 +33,33 @@ CORS(app)
 FANAR_9B_MODEL = "Fanar-C-1-8.7B"
 router_model = os.getenv("FANAR_ROUTER_MODEL", FANAR_9B_MODEL)
 responder_model = os.getenv("FANAR_RESPONDER_MODEL", FANAR_9B_MODEL)
+USE_FANAR_ROUTER = os.getenv("QAARIB_USE_FANAR_ROUTER", "0") == "1"
 
 
 def _clean(text):
     return re.sub(r"\s+", " ", (text or "").lower().strip())
 
 
-def _extended_greeting_answer(user_prompt):
-    """Catch natural greetings like 'ahlan wa sahlan' or 'salam bro'.
+def _compact_fanar_prompt(user_prompt, history=""):
+    # Keep this tiny. During server load, huge system/history prompts are killing latency.
+    recent = ""
+    if history:
+        recent = history[-1200:]
+    return f"""
+You are Qaarib, a Qatar-focused assistant for the Fanar Hackathon.
+Be concise, helpful, and practical. Default to English. Do not mention backend/tool failures.
+For Qatar questions, stay Qatar-local. If unsure, say what to check next.
 
-    These are not worth a Fanar router call during the demo. Keep this narrow so
-    real requests that happen to contain 'salam' still route normally.
-    """
+Recent context:
+{recent if recent else "No previous context."}
+
+User: {user_prompt}
+Qaarib:
+""".strip()
+
+
+def _extended_greeting_answer(user_prompt):
+    """Catch natural greetings like 'ahlan wa sahlan' or 'salam bro'."""
     text = _clean(user_prompt)
     if not text:
         return None
@@ -60,10 +75,6 @@ def _extended_greeting_answer(user_prompt):
         "wa", "wala", "w", "bro", "brother", "habibi", "akhi", "man", "dear",
         "how", "are", "you", "u", "r", "doing", "going", "it", "is", "things"
     }
-    route_or_task_words = {
-        "route", "routes", "metro", "tram", "bus", "calendar", "event", "events",
-        "where", "how", "get", "go", "from", "to", "near", "nearby", "food", "eat", "restaurant"
-    }
 
     has_greeting = any(t in greeting_tokens for t in tokens)
     greeting_start = tokens and tokens[0] in greeting_tokens
@@ -75,9 +86,8 @@ def _extended_greeting_answer(user_prompt):
         t in {"alaikum", "alaykum", "alikum"} for t in tokens
     )
     has_ahlan_sahlan = ("ahlan" in tokens or "ahlaan" in tokens) and any(t.startswith("sahl") for t in tokens)
-
-    # Pure greeting: all tokens are greeting/filler words, with no actual local task.
     pure_greeting = has_greeting and all((t in greeting_tokens or t in filler_tokens or t in {"alaikum", "alaykum", "alikum"}) for t in tokens)
+
     if greeting_start and (has_how_are_you or has_salam_pair or has_ahlan_sahlan or pure_greeting):
         if has_salam_pair:
             return "Wa alaikum assalam — I’m Qaarib, ready for Qatar routes, places, events, and quick local help."
@@ -118,10 +128,6 @@ def chat():
             return jsonify({"response": greeting, "router": router_data,
                             "timing": {"router_ms": 0, "tool_ms": 0, "responder_ms": 0}})
 
-        # ── Pre-router deterministic direct/route plan ─────────────────────────
-        # Greetings, identity, GPS, current time, calendar creation, and routes
-        # between known Qatar locations are handled WITHOUT calling Fanar. This
-        # is the reliability backbone: these never time out, even if Fanar is down.
         pre = get_pre_router_plan(user_prompt, history_before_turn)
         if pre:
             append_router_decision(pre)
@@ -133,7 +139,6 @@ def chat():
                 tool_ms = round((time.perf_counter() - tool_start) * 1000, 2)
                 response = direct_answer_from_results(tool_results, pre)
                 if not response:
-                    # Surface the first tool final_answer/summary deterministically.
                     parts = [r.get("final_answer") or r.get("summary", "") for r in (tool_results or []) if r.get("final_answer") or r.get("summary")]
                     response = "\n".join(p for p in parts if p).strip()
                 if not response:
@@ -142,33 +147,24 @@ def chat():
             return jsonify({"response": response, "router": pre,
                             "timing": {"router_ms": 0, "tool_ms": tool_ms, "responder_ms": 0}})
 
-        # ── Local tool-intent router fast path ──────────────────────────────────
-        # For obvious demo intents (places, food, nightlife, photo spots, resorts,
-        # URL scrape, etc.) skip the Fanar router and only use Fanar once if we
-        # need it to compose tool results. This removes the common 2-call latency.
         local_plan = _local_rule_plan(user_prompt, history_before_turn)
         if local_plan:
             router_data = local_plan
-            router_ms = 0
+        elif not USE_FANAR_ROUTER:
+            # Emergency mode: skip Fanar-as-router. One Fanar call is already risky;
+            # two calls is what caused the UI to hang/fallback under load.
+            router_data = {"tools": [], "queries": {}, "reason": "emergency_single_fanar_responder", "confidence": 0.7}
         else:
-            # ── Fanar router (open-ended / ambiguous intent) ───────────────────
             try:
                 router_prompt = build_router_prompt(user_prompt, history_before_turn)
-                router_raw, router_ms = ask_fanar_timed(router_prompt, router_model, max_tokens=300)
+                router_raw, router_ms = ask_fanar_timed(router_prompt, router_model, max_tokens=220)
                 router_data = parse_router_response(router_raw)
             except Exception:
-                # Router timed out/failed: fall back to local rules with an empty plan
-                # so transit/place rules can still fire deterministically.
                 router_data = apply_local_router_rules(
                     user_prompt, history_before_turn,
                     {"tools": [], "queries": {}, "reason": "router_fallback", "confidence": 0.0},
                 )
                 router_ms = 0
-                if not router_data.get("tools") and not router_data.get("direct_answer"):
-                    fallback = ("Fanar is taking a moment right now. I can still help with specific local tasks: "
-                                "metro routes, current time, calendar events, or named Qatar places. Please restate your request.")
-                    append_turn(user_prompt, fallback)
-                    return jsonify({"response": fallback, "timing": {"router_ms": router_ms, "tool_ms": 0, "responder_ms": 0}})
 
             router_data = apply_local_router_rules(user_prompt, history_before_turn, router_data)
 
@@ -180,8 +176,6 @@ def chat():
 
         if policy_answer:
             response = str(policy_answer).strip()
-            tool_ms = 0
-            responder_ms = 0
         else:
             tool_start = time.perf_counter()
             tool_results, active_tool_label, _tool_notes = run_tools(router_data, user_prompt, history_before_turn)
@@ -190,15 +184,17 @@ def chat():
             deterministic = direct_answer_from_results(tool_results, router_data)
             if deterministic:
                 response = deterministic
-                responder_ms = 0
             else:
                 try:
-                    sent_prompt = build_prompt(user_prompt, tool_results=tool_results, active_tool_label=active_tool_label)
-                    response, responder_ms = ask_fanar_timed(sent_prompt, responder_model, max_tokens=500)
+                    if router_data.get("tools"):
+                        sent_prompt = build_prompt(user_prompt, tool_results=tool_results, active_tool_label=active_tool_label)
+                    else:
+                        sent_prompt = _compact_fanar_prompt(user_prompt, history_before_turn)
+                    response, responder_ms = ask_fanar_timed(sent_prompt, responder_model, max_tokens=320)
                 except Exception:
                     parts = [r.get("final_answer") or r.get("summary", "") for r in (tool_results or []) if r.get("final_answer") or r.get("summary")]
                     response = "\n".join(p for p in parts if p).strip() or (
-                        "Fanar is taking a moment. For specific tasks like routes, time, or calendar events, try restating the request directly."
+                        "I’m under heavy load right now, but I can still help fastest with routes, places, time, and calendar tasks. Try a direct Qatar-local request."
                     )
                     responder_ms = 0
 
@@ -213,12 +209,7 @@ def chat():
             },
         })
     except Exception as e:
-        err_str = str(e)
-        if "timed out" in err_str.lower() or "timeout" in err_str.lower() or "connectionpool" in err_str.lower():
-            msg = "Fanar is taking a moment to respond. Try a more specific request or retry shortly."
-            return jsonify({"error": msg}), 503
-        # Strip raw Python exception internals before sending to frontend
-        safe = err_str.split("\n")[0][:200] if err_str else "An unexpected error occurred."
+        safe = str(e).split("\n")[0][:200] if str(e) else "An unexpected error occurred."
         return jsonify({"error": safe}), 500
 
 
