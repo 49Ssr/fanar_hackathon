@@ -14,70 +14,68 @@ GREEN = "\033[32m"
 YELLOW = "\033[33m"
 MAGENTA = "\033[35m"
 BLUE = "\033[34m"
-RED = "\033[31m"
 
 SCENARIOS = {
     "airport": [
-        ("INPUT", "user asks for the cheapest route from Ras Bu Aboud to HIA T1", CYAN),
-        ("CONTEXT", "Qaarib keeps recent chat state but trims it before routing", BLUE),
-        ("INTENT", "local intent detector recognises a Qatar transit request", MAGENTA),
-        ("RESILIENCE", "Fanar router is bypassed to avoid double model latency", YELLOW),
-        ("MODEL", "backup model locked: Fanar-C-1-8.7B for any required generation", YELLOW),
-        ("PLAN", "route_plan selected with public-transport preference", GREEN),
-        ("NORMALIZE", "Ras Abu/Ras Bu Aboud resolved to Ras Bu Aboud station", GREEN),
-        ("NORMALIZE", "HIA T1 resolved to Hamad International Airport Terminal 1", GREEN),
-        ("GRAPH", "metro graph search finds Gold Line -> Msheireb -> Red Line -> airport branch", GREEN),
-        ("TOOLS", "deterministic route answer produced without waiting for Fanar", GREEN),
-        ("FORMAT", "response is cleaned for judge-facing readability", MAGENTA),
-        ("WIDGET", "frontend can attach route cards, map links, and high-load disclaimer", CYAN),
-        ("OUTPUT", "Qaarib returns a useful answer even if Fanar is overloaded", GREEN),
+        ("REQUEST", "route intent: Ras Bu Aboud -> HIA T1, avoid taxi", CYAN, 0.20),
+        ("STATE", "history window loaded; last user turn preserved", BLUE, 0.18),
+        ("RULE", "route keywords matched; public-transport preference detected", MAGENTA, 0.28),
+        ("ROUTER", "local route path selected; model router not required", YELLOW, 0.22),
+        ("MODEL", "Fanar reserved for wording only if tool answer is incomplete", YELLOW, 0.25),
+        ("TOOL", "route_plan(origin=Ras Bu Aboud, destination=HIA T1)", GREEN, 0.55),
+        ("MATCH", "alias: ras abu aboud -> Ras Bu Aboud", GREEN, 0.20),
+        ("MATCH", "alias: hia t1 -> Hamad International Airport T1", GREEN, 0.18),
+        ("GRAPH", "path: Gold Line -> Msheireb -> Red Line -> airport branch", GREEN, 0.70),
+        ("FORMAT", "route steps normalized for frontend response", MAGENTA, 0.24),
+        ("UI", "route cards + map backup attached", CYAN, 0.26),
+        ("DONE", "response ready", GREEN, 0.15),
     ],
     "qatar_services": [
-        ("INPUT", "user asks for a Qatar-local service, venue, or recommendation", CYAN),
-        ("CONTEXT", "recent conversation is loaded for continuity", BLUE),
-        ("INTENT", "local planner identifies place_lookup / web_search / route_plan candidates", MAGENTA),
-        ("RESILIENCE", "obvious tool requests skip the Fanar router", YELLOW),
-        ("TOOLS", "Qatar-scoped API calls run in parallel where possible", GREEN),
-        ("RANK", "results are filtered toward Qatar relevance and practical next steps", GREEN),
-        ("WIDGET", "Oryx/widget layer can render cards instead of plain text", CYAN),
-        ("OUTPUT", "answer is delivered with map/source backups", GREEN),
+        ("REQUEST", "local recommendation intent detected", CYAN, 0.20),
+        ("STATE", "recent Qatar context loaded", BLUE, 0.16),
+        ("RULE", "place lookup and web lookup candidates selected", MAGENTA, 0.30),
+        ("ROUTER", "tool route selected directly", YELLOW, 0.18),
+        ("TOOL", "place_search(region=QA)", GREEN, 0.55),
+        ("TOOL", "web_search(Qatar-scoped query)", GREEN, 0.65),
+        ("RANK", "results filtered for Qatar relevance and actionability", GREEN, 0.35),
+        ("UI", "place cards prepared", CYAN, 0.25),
+        ("DONE", "response ready", GREEN, 0.15),
     ],
     "generic": [
-        ("INPUT", "user asks an open-ended question", CYAN),
-        ("CONTEXT", "history is compressed into a small prompt window", BLUE),
-        ("INTENT", "no deterministic tool path is confident enough", MAGENTA),
-        ("RESILIENCE", "router call skipped; Qaarib makes only one model request", YELLOW),
-        ("MODEL", "Fanar-C-1-8.7B receives compact Qaarib prompt", YELLOW),
-        ("MODEL", "response received and checked for backend leakage", GREEN),
-        ("OUTPUT", "concise answer is sent to chat UI", GREEN),
+        ("REQUEST", "open-ended user prompt received", CYAN, 0.20),
+        ("STATE", "history compressed for prompt window", BLUE, 0.28),
+        ("RULE", "no confident tool path", MAGENTA, 0.25),
+        ("ROUTER", "single compact model call selected", YELLOW, 0.18),
+        ("MODEL", "Fanar request sent", YELLOW, 0.85),
+        ("MODEL", "Fanar response received", GREEN, 0.75),
+        ("FORMAT", "response checked for user-facing clarity", MAGENTA, 0.22),
+        ("DONE", "response ready", GREEN, 0.15),
     ],
-    "fallback": [
-        ("INPUT", "server load spikes during a judge interaction", CYAN),
-        ("CONTEXT", "local state and deterministic tools remain available", BLUE),
-        ("RESILIENCE", "slow model requests are redirected away from 27B / default Fanar", YELLOW),
-        ("RECOVERY", "fallback model attempted with shorter timeout", YELLOW),
-        ("RECOVERY", "if generation fails, local tool output is still shown", YELLOW),
-        ("UI", "frontend displays a calm high-load note below the answer", CYAN),
-        ("OUTPUT", "demo degrades gracefully instead of showing a blank failure", GREEN),
+    "resilience": [
+        ("REQUEST", "user request received during high API load", CYAN, 0.20),
+        ("STATE", "local session and tool state available", BLUE, 0.18),
+        ("RULE", "deterministic tool coverage checked first", MAGENTA, 0.26),
+        ("MODEL", "large model path avoided for latency control", YELLOW, 0.25),
+        ("MODEL", "compact Fanar request attempted", YELLOW, 0.75),
+        ("TOOL", "local tool output retained as fallback answer source", GREEN, 0.45),
+        ("UI", "high-load note available for frontend", CYAN, 0.22),
+        ("DONE", "response ready", GREEN, 0.15),
     ],
 }
 
 COLORS = {
-    "INPUT": CYAN,
-    "CONTEXT": BLUE,
-    "INTENT": MAGENTA,
-    "RESILIENCE": YELLOW,
+    "REQUEST": CYAN,
+    "STATE": BLUE,
+    "RULE": MAGENTA,
+    "ROUTER": YELLOW,
     "MODEL": YELLOW,
-    "PLAN": GREEN,
-    "NORMALIZE": GREEN,
+    "TOOL": GREEN,
+    "MATCH": GREEN,
     "GRAPH": GREEN,
-    "TOOLS": GREEN,
     "FORMAT": MAGENTA,
-    "WIDGET": CYAN,
-    "RANK": GREEN,
-    "RECOVERY": YELLOW,
     "UI": CYAN,
-    "OUTPUT": GREEN,
+    "RANK": GREEN,
+    "DONE": GREEN,
 }
 
 
@@ -90,8 +88,7 @@ def ask_float(prompt, default):
     if not raw:
         return default
     try:
-        value = float(raw)
-        return max(0.5, value)
+        return max(0.5, float(raw))
     except ValueError:
         print("Invalid number, using default.")
         return default
@@ -126,35 +123,35 @@ def choose_scenario(default="airport"):
 
 def interactive_config(default_scenario, default_interval, default_loop):
     os.system("clear" if os.name != "nt" else "cls")
-    print(f"{BOLD}Qaarib fallback side panel setup{RESET}")
+    print(f"{BOLD}Qaarib runtime trace setup{RESET}")
     print(f"{DIM}Press Enter to accept defaults. Ctrl+C cancels.\n{RESET}")
     scenario = choose_scenario(default_scenario)
-    interval = ask_float("Interval in seconds", default_interval)
+    interval = ask_float("Maximum step time in seconds", default_interval)
     loop = ask_bool("Loop trace", default_loop)
     input("\nPress Enter to start...")
     os.system("clear" if os.name != "nt" else "cls")
     return scenario, interval, loop
 
 
-def line(stage, message, color):
-    latency = random.randint(24, 920)
-    pid = os.getpid()
-    return f"{DIM}{now()}{RESET} {color}{stage:<10}{RESET} {message} {DIM}pid={pid} latency={latency}ms{RESET}"
+def line(stage, message, color, duration):
+    elapsed_ms = max(8, int(duration * 1000 + random.randint(-60, 80)))
+    return f"{DIM}{now()}{RESET} {color}{stage:<8}{RESET} {message} {DIM}{elapsed_ms}ms{RESET}"
 
 
 def banner(scenario, interval, loop):
     print(f"{BOLD}Qaarib runtime trace{RESET}")
-    print(f"{DIM}scenario={scenario} interval={interval}s loop={loop} mode=demo-fallback side-panel{RESET}")
+    print(f"{DIM}scenario={scenario} max_step={interval}s loop={loop} mode=presentation-runtime{RESET}")
     print("-" * 88)
     sys.stdout.flush()
 
 
-def stream_events(events, interval, loop):
+def stream_events(events, max_interval, loop):
     source = itertools.cycle(events) if loop else iter(events)
-    for stage, message, color in source:
-        print(line(stage, message, color or COLORS.get(stage, RESET)))
+    for stage, message, color, factor in source:
+        duration = max(0.15, max_interval * factor)
+        print(line(stage, message, color or COLORS.get(stage, RESET), duration))
         sys.stdout.flush()
-        time.sleep(interval)
+        time.sleep(duration)
 
 
 def main():
@@ -167,9 +164,9 @@ def main():
     parser.add_argument("--no-menu", action="store_true")
     args = parser.parse_args()
 
-    global RESET, DIM, BOLD, CYAN, GREEN, YELLOW, MAGENTA, BLUE, RED
+    global RESET, DIM, BOLD, CYAN, GREEN, YELLOW, MAGENTA, BLUE
     if args.no_color:
-        RESET = DIM = BOLD = CYAN = GREEN = YELLOW = MAGENTA = BLUE = RED = ""
+        RESET = DIM = BOLD = CYAN = GREEN = YELLOW = MAGENTA = BLUE = ""
 
     scenario = args.scenario
     interval = max(0.5, args.interval)

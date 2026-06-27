@@ -1,35 +1,47 @@
 # Qaarib
 
-Qaarib is a Qatar-focused assistant built for the Fanar Hackathon 2026.
+Qaarib is a Fanar-powered Qatar companion that turns everyday local needs — routes, places, events, culture, and services — into actionable answers with tools, context, and visual widgets.
 
-The goal is to make local navigation, transport, places, and Qatar-specific service discovery feel more natural than a generic chatbot. Qaarib combines Fanar LLMs with tool-based lookup for routes, places, web search, and a local Qatar transit knowledge layer.
+Built for the Fanar Hackathon 2026, Qaarib explores how a Qatar-aware assistant can go beyond generic chatbot answers. It combines Fanar LLMs with local routing rules, lookup tools, Qatar transit knowledge, session memory, and a widget-oriented frontend layer so users can ask naturally and receive practical next steps.
 
-> **Status:** Work in progress. Features, prompts, routing rules, UI flow, and demo scenarios are still being finalised before the hackathon presentation.
+## Why Qaarib
 
-## Core idea
+Generic assistants can answer broad questions, but they often struggle with local details: which metro line to take, how a follow-up connects to the previous request, whether a place is in Education City or elsewhere in Doha, and how to turn a recommendation into action.
 
-Qaarib acts as a local companion for Qatar. Instead of only answering from model memory, it can route user requests through backend tools and return grounded answers for:
+Qaarib focuses on Qatar-specific convenience:
 
-* nearby places and recommendations
-* Doha Metro / tram-aware routing
-* Education City navigation
-* airport and transit questions
-* Qatar-specific web/service lookups
-* follow-up questions with session context
+* navigating Doha Metro, Lusail Tram, Education City, Msheireb, HIA, and common local destinations
+* finding nearby cafés, qahwa, restaurants, cultural venues, and service points
+* surfacing events, activities, and local context in a way that fits Qatar's culture and daily life
+* combining map links, cards, and concise instructions instead of returning only paragraphs
+* keeping enough session context to handle follow-ups like "give me directions" or "what is nearby?"
 
-## Current backend features
+## Where Fanar is used
 
-The backend currently includes:
+Fanar is used as Qaarib's language layer. The backend calls Fanar for response generation and, when enabled, intent routing. During high-load conditions, Qaarib can reduce unnecessary model calls by using deterministic local routing for obvious tool requests, then calling Fanar only when language generation is needed.
+
+Relevant files:
+
+```txt
+backend/fanar_client.py
+backend/router.py
+backend/server.py
+backend/app.py
+backend/chat_session.py
+```
+
+## Core capabilities
 
 * Fanar API integration
-* model-based router for tool selection
-* local deterministic guardrails for fragile demo-critical cases
+* Fanar-based and local intent routing paths
 * Google Places lookup
 * Google Routes lookup
-* web search fallback
-* session history tracking through `chat_history.md`
-* Qatar transit network data under `backend/data/`
+* web search integration
+* local Qatar transit topology under `backend/data/`
+* session history tracking
+* response formatting for route/place/tool answers
 * evaluation harness under `backend/evaluation/`
+* synchronized presentation runtime under `demo_fallback/`
 
 ## Qatar transit awareness
 
@@ -39,42 +51,9 @@ Qaarib includes a local transit topology file:
 backend/data/qatar_transit_network.json
 ```
 
-This is used to improve awareness of:
+This improves awareness of Doha Metro Red, Green, and Gold lines; Msheireb and Al Bidda interchanges; the HIA T1 airport branch; Education City/QNL/Al Shaqab access; Lusail Tram links; and local tram contexts.
 
-* Doha Metro Red, Green, and Gold lines
-* Msheireb interchange
-* Al Bidda interchange
-* HIA T1 Red Line airport branch
-* Al Wakra / Ras Bu Fontas branch context
-* Education City / QNL / Al Shaqab Green Line access
-* Lusail Tram connection through Legtaifiya
-* Msheireb Tram as a local downtown loop
-* Education City Tram as a campus network
-
-This data is not a live schedule source. Live timings, access changes, disruptions, or official announcements should still be checked through live/official sources.
-
-## Project structure
-
-```txt
-backend/
-  app.py
-  fanar_client.py
-  router.py
-  chat_session.py
-  places_client.py
-  route_client.py
-  search_client.py
-  data/
-    qatar_transit_network.json
-  rules/
-    local_rules.py
-  evaluation/
-    run_eval.py
-    eval_cases.jsonl
-    gemini_judge.py
-    fanar_client_eval.py
-    scoring.py
-```
+This data is not a live schedule source. Live timings, disruptions, pricing, access changes, or official announcements should still be checked through live and official sources.
 
 ## Setup
 
@@ -88,17 +67,17 @@ Fill in the required keys:
 
 ```env
 FANAR_API_KEY=...
-FANAR_ROUTER_MODEL=Fanar-C-2-27B
-FANAR_RESPONDER_MODEL=Fanar
+FANAR_ROUTER_MODEL=Fanar-C-1-8.7B
+FANAR_RESPONDER_MODEL=Fanar-C-1-8.7B
+FANAR_BACKUP_MODEL=Fanar-C-1-8.7B
+FANAR_ALLOW_BIG_MODELS=0
+QAARIB_USE_FANAR_ROUTER=0
 
 GOOGLE_API_KEY=...
 GOOGLE_CSE_ID=...
 
 GEMINI_API_KEY=...
 GEMINI_JUDGE_MODEL=gemini-3.5-flash
-
-FANAR_EVAL_MODELS=Fanar,Fanar-C-1-8.7B,Fanar-C-2-27B
-EVAL_TIME_LIMIT_MINUTES=60
 ```
 
 Install requirements:
@@ -108,7 +87,13 @@ cd backend
 python -m pip install -r requirements.txt
 ```
 
-Run the backend:
+Run the Flask backend used by the frontend:
+
+```bash
+python server.py
+```
+
+Run the CLI backend:
 
 ```bash
 python app.py
@@ -116,43 +101,32 @@ python app.py
 
 ## Evaluation
 
-The evaluation harness is separate from the main app runtime.
-
 ```bash
 cd backend
 python evaluation/run_eval.py
 ```
 
-Evaluation outputs are written to:
+Evaluation outputs are written to `backend/evaluation/outputs/` and ignored by Git.
 
-```txt
-backend/evaluation/outputs/
+## Presentation runtime
+
+The `demo_fallback/` folder contains a synchronized browser-and-terminal runtime view for presenting Qaarib's internal flow: local intent detection, Fanar model selection, route/tool planning, widget preparation, and graceful handling of high server load.
+
+```bash
+python demo_fallback/run_synced_demo.py
 ```
 
-These outputs are ignored by Git.
+The launcher asks for the scenario, interval, and loop setting, then opens the browser view and terminal trace on the same timer.
 
-## Demo direction
-
-The intended demo is to show Qaarib handling realistic Qatar-local situations, for example:
+## Example scenarios
 
 * finding nearby qahwa / dates / café options around Msheireb
-* correcting vague follow-up questions like “give me directions”
-* routing through Qatar’s metro/tram network
-* handling Al Wakra / HIA / Lusail / Education City transit scenarios
+* correcting vague follow-up questions like "give me directions"
+* routing through Qatar's metro/tram network
+* handling HIA / Ras Bu Aboud / Lusail / Education City transit scenarios
+* helping users discover cultural venues, events, and local activities
 * avoiding overconfident answers when a tool does not confirm prices, menus, or facilities
 
-## Important disclaimer
+## Disclaimer
 
-This repository is currently in active hackathon development.
-
-Some behaviours may still change before the final demo, including:
-
-* routing prompts
-* local rule guardrails
-* transit graph details
-* evaluation cases
-* frontend integration
-* final demo script
-* UI/UX flow
-
-The current backend should be treated as a working prototype, not a polished production assistant.
+Qaarib is a hackathon prototype. It demonstrates how Fanar can power a Qatar-aware assistant, but live schedules, official policies, service availability, and venue details should still be verified through authoritative sources before real-world use.

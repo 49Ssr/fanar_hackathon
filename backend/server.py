@@ -5,6 +5,8 @@ from dotenv import load_dotenv
 import os
 import time
 import re
+import threading
+import webbrowser
 
 from fanar_client import ask_fanar_timed
 from chat_session import (
@@ -17,19 +19,18 @@ from chat_session import (
 from router import build_router_prompt, parse_router_response
 from rules.local_rules import apply_local_router_rules, get_pre_router_plan, _local_rule_plan
 
-# Reuse the CLI's real execution path instead of maintaining a divergent copy.
-# app.py is safe to import: its CLI loop is under if __name__ == "__main__".
 from app import run_tools, direct_answer_from_results
 
 BASE_DIR = Path(__file__).resolve().parent
+REPO_ROOT = BASE_DIR.parent
+FRONTEND_INDEX = REPO_ROOT / "frontend" / "index.html"
 load_dotenv(BASE_DIR / ".env")
 load_dotenv()
 
 flask_app = Flask(__name__)
-app = flask_app  # keep the conventional name for Flask runners
+app = flask_app
 CORS(app)
 
-# Hackathon load fallback: organisers recommended the ~9B model while Fanar is overloaded.
 FANAR_9B_MODEL = "Fanar-C-1-8.7B"
 router_model = os.getenv("FANAR_ROUTER_MODEL", FANAR_9B_MODEL)
 responder_model = os.getenv("FANAR_RESPONDER_MODEL", FANAR_9B_MODEL)
@@ -43,9 +44,19 @@ def _clean(text):
 def _compact_fanar_prompt(user_prompt, history=""):
     recent = history[-1200:] if history else ""
     return f"""
-You are Qaarib, a Qatar-focused assistant for the Fanar Hackathon.
-Be concise, helpful, and practical. Default to English. Do not mention backend/tool failures.
-For Qatar questions, stay Qatar-local. If unsure, say what to check next.
+You are Qaarib, a Qatar-local assistant.
+Sound like a switched-on local helper: warm, practical, brief, not corporate.
+Do not say "I understand" or "let me know if you need anything else".
+Prefer: "Best move:", "Easy one:", "Heads up:", "Worth checking:".
+Stay Qatar-local. Do not mention provider failover, APIs, backend issues, or internal routing.
+
+Hard Qatar transit facts:
+- QCRI/HBKU is in Education City.
+- Education City access is on the Green Line, especially Qatar National Library / Education City stations depending exact building and entrance.
+- QCRI is not on the Red Line or Gold Line.
+- Legtaifiya is on the Red Line and links to Lusail Tram; it is not on the Green Line.
+- DECC is on the Red Line, not the Education City/QCRI stop.
+- If corrected by the user, do not invent bus routes or new stations. Lock to known facts or ask to verify.
 
 Recent context:
 {recent if recent else "No previous context."}
@@ -55,8 +66,39 @@ Qaarib:
 """.strip()
 
 
+def _qcri_answer(user_prompt, history=""):
+    text = _clean(user_prompt)
+    h = _clean(history)
+    qcri_context = any(x in text or x in h[-2500:] for x in ["qcri", "hbku", "education city", "qatar computing research institute"])
+    correction = any(x in text for x in ["wrong", "not on", "wtf", "no", "incorrect", "again"])
+
+    if any(x in text for x in ["where qcri", "where is qcri", "do you know where qcri", "hbku qcri", "qatar computing research institute"]):
+        return (
+            "Yes — QCRI is in Education City, within HBKU/Qatar Foundation.\n"
+            "Metro-wise, think Green Line: Qatar National Library or Education City station, depending which entrance/building you’re using.\n"
+            "Not Red Line, not Gold Line."
+        )
+
+    if qcri_context and correction:
+        return (
+            "Fair — lock this in: QCRI/HBKU is Education City.\n"
+            "Use the Green Line side: Qatar National Library / Education City area.\n"
+            "Not Red Line, not Gold Line, not Legtaifiya, and not DECC. I shouldn’t have guessed bus routes there."
+        )
+
+    return None
+
+
+def _smalltalk_answer(user_prompt):
+    text = _clean(user_prompt)
+    if any(x in text for x in ["how are u", "how are you", "how r u", "how you doing", "how u doing"]):
+        return "Alhamdulillah, doing good. What’s the move — route, place, event, or something Qatar-local?"
+    if text in {"do you know where i am", "where am i", "can you tell where i am"}:
+        return "Not exactly — I don’t get your live location unless you tell me. Drop the area or landmark and I’ll work from there."
+    return None
+
+
 def _extended_greeting_answer(user_prompt):
-    """Catch natural greetings like 'ahlan wa sahlan' or 'salam bro'."""
     text = _clean(user_prompt)
     if not text:
         return None
@@ -87,17 +129,12 @@ def _extended_greeting_answer(user_prompt):
 
     if greeting_start and (has_how_are_you or has_salam_pair or has_ahlan_sahlan or pure_greeting):
         if has_salam_pair:
-            return "Wa alaikum assalam — I’m Qaarib, ready for Qatar routes, places, events, and quick local help."
-        return "Ahlan wa sahlan — I’m Qaarib, ready for Qatar routes, places, events, and quick local help."
+            return "Wa alaikum assalam — Qaarib here. Tell me where you are and where you’re trying to go; I’ll sort the Qatar route or place angle."
+        return "Ahlan — Qaarib here. Give me the place, route, or plan, and I’ll make it practical for Qatar."
     return None
 
 
 def _polish_response(response, tool_results=None):
-    """Final presentation cleanup for fragile deterministic route text.
-
-    This does not call Fanar. It just removes the ugly repeated transfer wording
-    from route_plan so the frontend bubble reads cleanly under demo pressure.
-    """
     text = (response or "").strip()
     route = None
     for item in tool_results or []:
@@ -109,17 +146,21 @@ def _polish_response(response, tool_results=None):
         origin = route.get("origin", "")
         destination = route.get("destination", "")
         maps_url = route.get("maps_url", "")
+        if origin == "Msheireb" and destination == "Souq Waqif":
+            text = "Easy one — from Msheireb, take the Gold Line eastbound one stop to Souq Waqif. If you’re already above ground in Msheireb Downtown, walking may be quicker; use the map for the exact exit."
+            if maps_url:
+                text += f"\n\nMap: {maps_url}"
+            return text
         if origin == "Ras Bu Aboud" and destination == "Hamad International Airport T1":
             text = (
-                "Cheapest route: use the metro instead of a taxi.\n"
-                "1. Start at Ras Bu Aboud station.\n"
-                "2. Take the Gold Line westbound to Msheireb.\n"
-                "3. At Msheireb, transfer to the Red Line southbound and ride to Oqba Ibn Nafie.\n"
-                "4. From Oqba Ibn Nafie, take the airport branch to Hamad International Airport T1.\n"
-                "Check live Qatar Rail timings and airport signage before you tap in."
+                "Best move: metro, not taxi.\n"
+                "1. Ras Bu Aboud → Msheireb on the Gold Line.\n"
+                "2. Msheireb → Oqba Ibn Nafie on the Red Line.\n"
+                "3. Follow the HIA T1 airport branch to the terminal.\n"
+                "Check live Qatar Rail signs before tapping in."
             )
             if maps_url:
-                text += f"\n\nMaps backup: {maps_url}"
+                text += f"\n\nMap: {maps_url}"
             return text
 
     replacements = {
@@ -128,11 +169,32 @@ def _polish_response(response, tool_results=None):
         "Continue through Oqba Ibn Nafie. Take Red Line airport branch toward HIA T1 to Hamad International Airport T1.":
             "From Oqba Ibn Nafie, take the airport branch to Hamad International Airport T1.",
         "Quick route: Use public transport for this one.":
-            "Cheapest route: use metro/public transport instead of taxis.",
+            "Best move: use metro/public transport.",
+        "I understand that ": "",
+        "Let me know if there's anything else I can assist with!": "",
     }
     for bad, good in replacements.items():
         text = text.replace(bad, good)
     return text.strip()
+
+
+def _open_frontend_after_start(port):
+    if os.getenv("QAARIB_AUTO_OPEN_FRONTEND", "1") != "1":
+        return
+
+    def _open():
+        time.sleep(float(os.getenv("QAARIB_AUTO_OPEN_DELAY", "1.2")))
+        try:
+            if FRONTEND_INDEX.exists():
+                webbrowser.open(FRONTEND_INDEX.resolve().as_uri(), new=2)
+                print(f"Opened frontend: {FRONTEND_INDEX}")
+            else:
+                webbrowser.open(f"http://127.0.0.1:{port}", new=2)
+                print(f"frontend/index.html not found; opened backend URL on port {port}")
+        except Exception as exc:
+            print(f"Could not auto-open frontend: {exc}")
+
+    threading.Thread(target=_open, daemon=True).start()
 
 
 @app.route("/health", methods=["GET"])
@@ -160,12 +222,12 @@ def chat():
     try:
         history_before_turn = load_history()
 
-        greeting = _extended_greeting_answer(user_prompt)
-        if greeting:
-            router_data = {"tools": [], "queries": {}, "reason": "local_extended_greeting", "confidence": 1.0, "direct_answer": greeting}
+        direct = _qcri_answer(user_prompt, history_before_turn) or _smalltalk_answer(user_prompt) or _extended_greeting_answer(user_prompt)
+        if direct:
+            router_data = {"tools": [], "queries": {}, "reason": "local_direct_answer", "confidence": 1.0, "direct_answer": direct}
             append_router_decision(router_data)
-            append_turn(user_prompt, greeting)
-            return jsonify({"response": greeting, "router": router_data,
+            append_turn(user_prompt, direct)
+            return jsonify({"response": direct, "router": router_data,
                             "timing": {"router_ms": 0, "tool_ms": 0, "responder_ms": 0}})
 
         pre = get_pre_router_plan(user_prompt, history_before_turn)
@@ -234,7 +296,7 @@ def chat():
                 except Exception:
                     parts = [r.get("final_answer") or r.get("summary", "") for r in (tool_results or []) if r.get("final_answer") or r.get("summary")]
                     response = "\n".join(p for p in parts if p).strip() or (
-                        "I’m under heavy load right now, but I can still help fastest with routes, places, time, and calendar tasks. Try a direct Qatar-local request."
+                        "Heads up — model is slow right now. Routes, places, time, and calendar tasks still work best if you ask directly."
                     )
                     responder_ms = 0
 
@@ -255,4 +317,6 @@ def chat():
 
 
 if __name__ == "__main__":
-    app.run(port=int(os.getenv("QAARIB_PORT", "5000")), debug=False)
+    port = int(os.getenv("QAARIB_PORT", "5000"))
+    _open_frontend_after_start(port)
+    app.run(port=port, debug=False)

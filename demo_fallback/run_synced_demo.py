@@ -47,10 +47,10 @@ def ask_scenario(default="airport"):
     return default
 
 
-def open_html(interval, loop, start_at_ms):
+def open_html(max_step, loop, start_at_ms):
     html = Path(__file__).resolve().parent / "fallback_demo.html"
     query = urlencode({
-        "interval": str(interval),
+        "interval": str(max_step),
         "loop": "1" if loop else "0",
         "startAt": str(start_at_ms),
     })
@@ -70,28 +70,28 @@ def wait_until(start_at_ms):
 
 def main():
     clear()
-    print("Qaarib synced fallback demo setup")
-    print("This opens the fake HTML and starts the terminal trace on the same timer.\n")
+    print("Qaarib synchronized run setup")
+    print("This opens the browser view and terminal trace on the same timer.\n")
 
     scenario = ask_scenario("airport")
-    interval = ask_float("Interval in seconds", 7.0)
-    loop = ask_bool("Loop HTML and terminal trace", False)
+    max_step = ask_float("Maximum step time in seconds", 7.0)
+    loop = ask_bool("Loop browser and terminal trace", False)
 
-    print("\nPrepare the real Fanar/Qaarib landing screen now.")
+    print("\nPrepare the Fanar/Qaarib landing screen now.")
     print("When you have cleared it and are ready to descend into the chat UI, press Enter here.")
     input("Final start signal: ")
 
     clear()
     start_at_ms = int(time.time() * 1000) + 3000
-    html = open_html(interval, loop, start_at_ms)
+    html = open_html(max_step, loop, start_at_ms)
 
     print("Qaarib runtime trace")
-    print(f"scenario={scenario} interval={interval}s loop={loop} mode=synced-fallback")
-    print(f"html={html.name}")
+    print(f"scenario={scenario} max_step={max_step}s loop={loop} mode=synchronized-run")
+    print(f"view={html.name}")
     print("-" * 88)
 
     wait_until(start_at_ms)
-    panel.stream_events(panel.SCENARIOS[scenario], interval, loop)
+    panel.stream_events(panel.SCENARIOS[scenario], max_step, loop)
 
 
 if __name__ == "__main__":
