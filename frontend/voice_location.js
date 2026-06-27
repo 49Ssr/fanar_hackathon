@@ -174,7 +174,10 @@
     var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) return null;
     var rec = new SpeechRecognition();
-    rec.lang = 'en-US';
+    // Language is selectable for the bilingual demo. Default English, but the
+    // Arabic ('ar-QA') path is what Ahmed's Gulf-Arabic flow needs. Toggle via
+    // window.QAARIB_VOICE_LANG = 'ar-QA' (or click the voice button's panel).
+    rec.lang = window.QAARIB_VOICE_LANG || 'en-US';
     rec.interimResults = true;
     rec.continuous = true;
     rec.maxAlternatives = 1;
@@ -266,6 +269,8 @@
   window.QAARIB_START_VOICE = startVoice;
   window.QAARIB_STOP_VOICE = stopVoice;
   window.QAARIB_TOGGLE_VOICE = toggleVoice;
+  window.QAARIB_SET_VOICE_LANG = function (lang) { window.QAARIB_VOICE_LANG = lang; };
+  window.QAARIB_VOICE_LANG = window.QAARIB_VOICE_LANG || 'en-US';
   window.QAARIB_REQUEST_LOCATION = requestLocation;
 
   document.addEventListener('DOMContentLoaded', function () {

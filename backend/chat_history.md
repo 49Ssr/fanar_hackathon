@@ -319,3 +319,158 @@ nop
 [ASSISTANT]
 Okay, got it. Our meeting is set for tomorrow at 4 PM outside the amphitheater entrance at Katara Cultural Village. If you need any further assistance, feel free to ask.
 
+
+
+[ROUTER]
+TOOLS: ['route_plan']
+QUERIES: {'route_plan': 'Souq Waqif to Lusail Marina, Doha, Qatar by public transport'}
+REASON: local_pre_router_transit_rule
+CONFIDENCE: 1.0
+
+
+[TOOL:route_plan:route_plan_006]
+QUERY: Souq Waqif to Lusail Marina, Doha, Qatar by public transport
+RESULTS:
+1. Transit route
+   MAPS_URL: https://www.google.com/maps/dir/?api=1&origin=Souq+Waqif&destination=Marina+-+South&travelmode=transit
+   ORIGIN: Souq Waqif
+   DESTINATION: Marina - South
+   RECOMMENDED_MODE: Gold Line + Red Line + Lusail Tram
+   TRAVEL_MODE: TRANSIT
+   DISTANCE: 9 transit/walking hops
+   DURATION: Check live Qatar Rail timings / walking map
+   SUMMARY: Quick route: Use public transport for this one. Start at Souq Waqif. Take Gold Line westbound toward Al Aziziyah to Msheireb. Transfer at Msheireb. Take Red Line northbound toward Lusail to Legtaifiya. Transfer at Legtaifiya. Take Lusail Tram toward the Marina/Lusail tram stops to Marina - South. Check live Qatar Rail / tram timings and platform signs before you tap in, but the network path is this.
+   FINAL_ANSWER: Quick route: Use public transport for this one. Start at Souq Waqif. Take Gold Line westbound toward Al Aziziyah to Msheireb. Transfer at Msheireb. Take Red Line northbound toward Lusail to Legtaifiya. Transfer at Legtaifiya. Take Lusail Tram toward the Marina/Lusail tram stops to Marina - South. Check live Qatar Rail / tram timings and platform signs before you tap in, but the network path is this.
+
+Maps backup: https://www.google.com/maps/dir/?api=1&origin=Souq+Waqif&destination=Marina+-+South&travelmode=transit
+
+
+[USER]
+dumbass speak cunt motherfucking asshole
+
+[ASSISTANT]
+Best move: use metro/public transport. Start at Souq Waqif. Take Gold Line westbound toward Al Aziziyah to Msheireb. Transfer at Msheireb. Take Red Line northbound toward Lusail to Legtaifiya. Transfer at Legtaifiya. Take Lusail Tram toward the Marina/Lusail tram stops to Marina - South. Check live Qatar Rail/tram signs before tapping in.
+
+Maps backup: https://www.google.com/maps/dir/?api=1&origin=Souq+Waqif&destination=Marina+-+South&travelmode=transit
+
+
+[ROUTER]
+TOOLS: []
+QUERIES: {}
+REASON: local_direct_answer
+CONFIDENCE: 1.0
+
+
+[USER]
+salam
+
+[ASSISTANT]
+Ahlan — Qaarib here. Give me the place, route, or plan, and I’ll make it practical for Qatar.
+
+
+[ROUTER]
+TOOLS: ['route_plan']
+QUERIES: {'route_plan': 'Lusail to Lusail Marina, Doha, Qatar by public transport'}
+REASON: local_pre_router_transit_rule
+CONFIDENCE: 1.0
+
+
+[TOOL:route_plan:route_plan_007]
+QUERY: Lusail to Lusail Marina, Doha, Qatar by public transport
+RESULTS:
+1. Transit route
+   MAPS_URL: https://www.google.com/maps/dir/?api=1&origin=Lusail&destination=Marina+-+South&travelmode=transit
+   ORIGIN: Lusail
+   DESTINATION: Marina - South
+   RECOMMENDED_MODE: Red Line + Lusail Tram
+   TRAVEL_MODE: TRANSIT
+   DISTANCE: 3 transit/walking hops
+   DURATION: Check live Qatar Rail timings / walking map
+   SUMMARY: Quick route: Use public transport for this one. Start at Lusail. Take Red Line southbound toward Msheireb; then follow Al Wakra / HIA T1 branch signage if continuing past Oqba Ibn Nafie to Legtaifiya. Transfer at Legtaifiya. Take Lusail Tram toward the Marina/Lusail tram stops to Marina - South. Check live Qatar Rail / tram timings and platform signs before you tap in, but the network path is this.
+   FINAL_ANSWER: Quick route: Use public transport for this one. Start at Lusail. Take Red Line southbound toward Msheireb; then follow Al Wakra / HIA T1 branch signage if continuing past Oqba Ibn Nafie to Legtaifiya. Transfer at Legtaifiya. Take Lusail Tram toward the Marina/Lusail tram stops to Marina - South. Check live Qatar Rail / tram timings and platform signs before you tap in, but the network path is this.
+
+Maps backup: https://www.google.com/maps/dir/?api=1&origin=Lusail&destination=Marina+-+South&travelmode=transit
+
+
+[USER]
+sing a song for me
+
+[ASSISTANT]
+Best move: use metro/public transport. Start at Lusail. Take Red Line southbound toward Msheireb; then follow Al Wakra / HIA T1 branch signage if continuing past Oqba Ibn Nafie to Legtaifiya. Transfer at Legtaifiya. Take Lusail Tram toward the Marina/Lusail tram stops to Marina - South. Check live Qatar Rail/tram signs before tapping in.
+
+Maps backup: https://www.google.com/maps/dir/?api=1&origin=Lusail&destination=Marina+-+South&travelmode=transit
+
+
+[ROUTER]
+TOOLS: []
+QUERIES: {}
+REASON: local_direct_answer
+CONFIDENCE: 1.0
+
+
+[USER]
+salam alikum akhi
+
+[ASSISTANT]
+Wa alaikum assalam — Qaarib here. Tell me where you are and where you’re trying to go; I’ll sort the Qatar route or place angle.
+
+
+[ROUTER]
+TOOLS: []
+QUERIES: {}
+REASON: local_direct_answer
+CONFIDENCE: 1.0
+
+
+[USER]
+where am i
+
+[ASSISTANT]
+I’ve got your browser location roughly: 25.32210, 51.42646. Accuracy depends on your device/browser, but I can use it for 'near me' and 'from here' routes.
+
+
+[ROUTER]
+TOOLS: []
+QUERIES: {}
+REASON: local_pre_router_direct_answer
+CONFIDENCE: 1.0
+
+
+[USER]
+roughly where am i located? near which building
+
+[ASSISTANT]
+I can resolve named Qatar places, but this CLI does not have live GPS access. Tell me your area, nearest landmark, or station — for example ‘I’m at QCRI’ or ‘I’m near DECC’ — and I can route or resolve it. In the frontend, pass browser GPS/coordinates into Qaarib for true current-location support.
+
+
+[ROUTER]
+TOOLS: ['route_plan']
+QUERIES: {'route_plan': 'DECC to Lusail Marina, Doha, Qatar by public transport'}
+REASON: local_pre_router_transit_rule
+CONFIDENCE: 1.0
+
+
+[TOOL:route_plan:route_plan_008]
+QUERY: DECC to Lusail Marina, Doha, Qatar by public transport
+RESULTS:
+1. Transit route
+   MAPS_URL: https://www.google.com/maps/dir/?api=1&origin=DECC&destination=Marina+-+South&travelmode=transit
+   ORIGIN: DECC
+   DESTINATION: Marina - South
+   RECOMMENDED_MODE: Red Line + Lusail Tram
+   TRAVEL_MODE: TRANSIT
+   DISTANCE: 4 transit/walking hops
+   DURATION: Check live Qatar Rail timings / walking map
+   SUMMARY: Quick route: Use public transport for this one. Start at DECC. Take Red Line northbound toward Lusail to Legtaifiya. Transfer at Legtaifiya. Take Lusail Tram toward the Marina/Lusail tram stops to Marina - South. Check live Qatar Rail / tram timings and platform signs before you tap in, but the network path is this.
+   FINAL_ANSWER: Quick route: Use public transport for this one. Start at DECC. Take Red Line northbound toward Lusail to Legtaifiya. Transfer at Legtaifiya. Take Lusail Tram toward the Marina/Lusail tram stops to Marina - South. Check live Qatar Rail / tram timings and platform signs before you tap in, but the network path is this.
+
+Maps backup: https://www.google.com/maps/dir/?api=1&origin=DECC&destination=Marina+-+South&travelmode=transit
+
+
+[USER]
+tell me about yourself
+
+[ASSISTANT]
+Best move: use metro/public transport. Start at DECC. Take Red Line northbound toward Lusail to Legtaifiya. Transfer at Legtaifiya. Take Lusail Tram toward the Marina/Lusail tram stops to Marina - South. Check live Qatar Rail/tram signs before tapping in.
+
+Maps backup: https://www.google.com/maps/dir/?api=1&origin=DECC&destination=Marina+-+South&travelmode=transit

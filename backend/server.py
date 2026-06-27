@@ -96,10 +96,19 @@ def _smalltalk_answer(user_prompt, location=None):
     text = _clean(user_prompt)
     if any(x in text for x in ["how are u", "how are you", "how r u", "how you doing", "how u doing"]):
         return "Alhamdulillah, doing good. What’s the move — route, place, event, or something Qatar-local?"
-    if text in {"do you know where i am", "where am i", "can you tell where i am"}:
+    location_phrases = [
+        "do you know where i am", "where am i", "can you tell where i am",
+        "where am i located", "where am i right now", "where am i rn",
+        "my current location", "what is my location", "what's my location",
+        "where exactly am i", "locate me", "near which building", "what building am i",
+    ]
+    if any(p in text for p in location_phrases):
         if isinstance(location, dict) and location.get("lat") and location.get("lng"):
-            return f"I’ve got your browser location roughly: {float(location['lat']):.5f}, {float(location['lng']):.5f}. Accuracy depends on your device/browser, but I can use it for 'near me' and 'from here' routes."
-        return "Not exactly — I don’t get your live location unless you allow browser location or tell me a landmark. Drop the area and I’ll work from there."
+            lat = float(location["lat"]); lng = float(location["lng"])
+            return (f"I’ve got your browser location: roughly {lat:.5f}, {lng:.5f} "
+                    f"(accuracy depends on your device). I can’t name the exact building from coordinates alone, "
+                    f"but I can use this for ‘near me’ places or ‘from here’ routes — just tell me where you want to go.")
+        return "I don’t get your live location unless your browser shares it or you tell me a landmark. Drop the area and I’ll work from there."
     return None
 
 
@@ -222,6 +231,61 @@ def reset():
     return jsonify({"status": "ok"})
 
 
+
+def _build_widgets(router_data, tool_results):
+    """Turn detected elements (router tools) + structured tool output into
+    widget descriptors the frontend can render as cards. Data-driven: the widget
+    type follows the tool the backend actually chose, not hardcoded per prompt.
+    """
+    widgets = []
+    tools = (router_data or {}).get("tools", []) or []
+    results = tool_results or []
+
+    for r in results:
+        if not isinstance(r, dict):
+            continue
+        # Route card — from route_plan tool output.
+        if r.get("origin") and r.get("destination") and (r.get("travel_mode") or r.get("recommended_mode")):
+            legs = []
+            mode = r.get("recommended_mode", "")
+            if mode:
+                legs = [s.strip() for s in re.split(r"\+|→|->", mode) if s.strip()]
+            widgets.append({
+                "type": "route",
+                "origin": r.get("origin", ""),
+                "destination": r.get("destination", ""),
+                "mode": r.get("travel_mode", ""),
+                "legs": legs,
+                "distance": r.get("distance", ""),
+                "duration": r.get("duration", ""),
+                "maps_url": r.get("maps_url", ""),
+                "summary": r.get("summary", "") or r.get("final_answer", ""),
+            })
+        # Place card — from place_lookup tool output.
+        elif r.get("title") and (r.get("address") or r.get("rating")):
+            widgets.append({
+                "type": "place",
+                "name": r.get("title", ""),
+                "address": r.get("address", ""),
+                "rating": r.get("rating", ""),
+                "rating_count": r.get("user_rating_count", ""),
+                "price_level": r.get("price_level", ""),
+                "maps_url": r.get("maps_url", ""),
+                "website": r.get("website", ""),
+            })
+        # Calendar card — from calendar_event tool output.
+        elif r.get("event_title") or (r.get("title") and r.get("start")):
+            widgets.append({
+                "type": "calendar",
+                "title": r.get("event_title") or r.get("title", ""),
+                "start": str(r.get("start", "")),
+                "end": str(r.get("end", "")),
+                "link": r.get("html_link") or r.get("maps_url", ""),
+            })
+
+    return widgets
+
+
 @app.route("/chat", methods=["POST"])
 def chat():
     data = request.get_json(silent=True) or {}
@@ -242,7 +306,7 @@ def chat():
             router_data = {"tools": [], "queries": {}, "reason": "local_direct_answer", "confidence": 1.0, "direct_answer": direct}
             append_router_decision(router_data)
             append_turn(user_prompt, direct)
-            return jsonify({"response": direct, "router": router_data, "timing": {"router_ms": 0, "tool_ms": 0, "responder_ms": 0}})
+            return jsonify({"response": direct, "router": router_data, "widgets": [], "timing": {"router_ms": 0, "tool_ms": 0, "responder_ms": 0}})
 
         pre = get_pre_router_plan(enriched_prompt, history_before_turn)
         if pre:
@@ -260,7 +324,7 @@ def chat():
                     response = "\n".join(p for p in parts if p).strip() or "I handled that locally but couldn't compose a result. Try rephrasing the request."
             response = _polish_response(response, tool_results)
             append_turn(user_prompt, response)
-            return jsonify({"response": response, "router": pre, "timing": {"router_ms": 0, "tool_ms": tool_ms, "responder_ms": 0}})
+            return jsonify({"response": response, "router": pre, "widgets": _build_widgets(pre, tool_results), "timing": {"router_ms": 0, "tool_ms": tool_ms, "responder_ms": 0}})
 
         local_plan = _local_rule_plan(enriched_prompt, history_before_turn)
         if local_plan:
@@ -301,7 +365,7 @@ def chat():
 
         response = _polish_response(response, tool_results)
         append_turn(user_prompt, response)
-        return jsonify({"response": response, "router": router_data, "timing": {"router_ms": router_ms, "tool_ms": tool_ms, "responder_ms": responder_ms}})
+        return jsonify({"response": response, "router": router_data, "widgets": _build_widgets(router_data, tool_results), "timing": {"router_ms": router_ms, "tool_ms": tool_ms, "responder_ms": responder_ms}})
     except Exception as e:
         safe = str(e).split("\n")[0][:200] if str(e) else "An unexpected error occurred."
         return jsonify({"error": safe}), 500

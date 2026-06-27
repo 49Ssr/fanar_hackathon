@@ -275,6 +275,11 @@ def _is_self_location_question(user_prompt):
     ]
     return any(re.search(p, text) for p in patterns)
 
+def _has_live_coordinates(history=""):
+    """True if the request carries browser coordinates ([CURRENT_LOCATION] block)."""
+    return "[current_location]" in _clean(history) or bool(re.search(r"lat=-?\d+\.\d+\s+lng=-?\d+\.\d+", history or ""))
+
+
 def direct_answer_for_prompt(user_prompt, history=""):
     """Small deterministic replies for identity/language/no-op cases.
 
@@ -286,17 +291,21 @@ def direct_answer_for_prompt(user_prompt, history=""):
     if not text:
         return "I'm here — send me the actual request when you're ready."
 
-    if _is_self_location_question(user_prompt):
-        return "I don’t have live location access in this CLI. Tell me your starting area, nearest landmark, or station — for example 'I’m at QCRI' or 'I’m near DECC' — and I can resolve it or route from there."
+    # If the frontend passed real browser coordinates, do NOT give the "no GPS"
+    # answer — defer so the location/route tools can use the coordinates.
+    coords_present = _has_live_coordinates(history)
 
-    if any(phrase in text for phrase in [
+    if _is_self_location_question(user_prompt) and not coords_present:
+        return "I don’t have live location access here unless your browser shares it. Tell me your starting area, nearest landmark, or station — for example 'I’m at QCRI' or 'I’m near DECC' — and I can resolve it or route from there."
+
+    if (not coords_present) and any(phrase in text for phrase in [
         "where am i located", "what is my location",
         "my current location", "where exactly am i", "locate me",
     ]):
         return (
-            "I can resolve named Qatar places, but this CLI does not have live GPS access. "
+            "I can resolve named Qatar places, but I don’t have live GPS unless your browser shares it. "
             "Tell me your area, nearest landmark, or station — for example ‘I’m at QCRI’ or ‘I’m near DECC’ — "
-            "and I can route or resolve it. In the frontend, pass browser GPS/coordinates into Qaarib for true current-location support."
+            "and I can route or resolve it."
         )
 
     if any(phrase in text for phrase in LANGUAGE_CORRECTION_WORDS):

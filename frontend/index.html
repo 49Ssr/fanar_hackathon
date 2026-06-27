@@ -908,20 +908,25 @@
         if (data.error) {
           appendBotText('Error: ' + data.error);
         } else {
-          var tools = (data.router && data.router.tools) || [];
-          var queries = (data.router && data.router.queries) || {};
-          if (tools.indexOf('route_plan') !== -1) {
-            var q = queries.route_plan || '';
-            var toIdx = q.indexOf(' to ');
-            var origin = toIdx !== -1 ? q.slice(0, toIdx) : q;
-            var dest = toIdx !== -1 ? q.slice(toIdx + 4) : '';
-            appendRouteWidget(origin, dest, '', []);
-          } else if (tools.indexOf('calendar_event') !== -1 || tools.indexOf('time_task') !== -1) {
-            var q = queries.calendar_event || queries.time_task || '';
-            appendScheduleWidget(q, '', '');
-          } else if (tools.indexOf('place_lookup') !== -1) {
-            var q = queries.place_lookup || '';
-            appendPlaceWidget(q, 'Doha, Qatar', '', '');
+          // Data-driven widgets: render from the structured `widgets` field the
+          // backend builds from real tool output (not guessed from the query text).
+          var widgets = data.widgets || [];
+          var renderedWidget = false;
+          for (var wi = 0; wi < widgets.length; wi++) {
+            var w = widgets[wi];
+            if (w.type === 'route') { appendRouteCard(w); renderedWidget = true; }
+            else if (w.type === 'place') { appendPlaceCard(w); renderedWidget = true; }
+            else if (w.type === 'calendar') { appendCalendarCard(w); renderedWidget = true; }
+          }
+          // Fallback to legacy query-based widgets only if backend sent none.
+          if (!renderedWidget) {
+            var tools = (data.router && data.router.tools) || [];
+            var queries = (data.router && data.router.queries) || {};
+            if (tools.indexOf('route_plan') !== -1) {
+              var q = queries.route_plan || '';
+              var toIdx = q.indexOf(' to ');
+              appendRouteWidget(toIdx !== -1 ? q.slice(0, toIdx) : q, toIdx !== -1 ? q.slice(toIdx + 4) : '', '', []);
+            }
           }
           appendBotText(data.response);
         }
@@ -934,6 +939,91 @@
         sendBtn.disabled = false;
         scrollBottom();
       });
+  }
+
+  // ── Data-driven widget cards ──────────────────────────────────────────────
+  var LINE_COLORS = {
+    'green line': '#00a14b', 'red line': '#d6001c', 'gold line': '#b8860b',
+    'lusail tram': '#7b3fa0', 'tram': '#7b3fa0'
+  };
+  function lineBadge(name) {
+    var key = String(name).toLowerCase().trim();
+    var color = '#888';
+    for (var k in LINE_COLORS) { if (key.indexOf(k) !== -1) { color = LINE_COLORS[k]; break; } }
+    return '<span style="display:inline-block;padding:3px 10px;border-radius:12px;background:' + color +
+           ';color:#fff;font-size:12px;font-weight:600;margin:2px 4px 2px 0;white-space:nowrap;">' +
+           escapeHtml(name) + '</span>';
+  }
+  function escapeHtml(s) {
+    return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+  function cardWrap(labelText) {
+    var wrap = document.createElement('div');
+    wrap.className = 'msg-bot fade-in';
+    var label = document.createElement('div');
+    label.className = 'bot-label';
+    label.textContent = labelText;
+    wrap.appendChild(label);
+    return wrap;
+  }
+
+  function appendRouteCard(w) {
+    var wrap = cardWrap('Qaarib · Route');
+    var legsHtml = (w.legs && w.legs.length)
+      ? w.legs.map(lineBadge).join('<span style="color:#666;margin:0 2px;">→</span>')
+      : '<span style="color:#999;font-size:13px;">Direct / walking</span>';
+    var maps = w.maps_url
+      ? '<a href="' + escapeHtml(w.maps_url) + '" target="_blank" rel="noopener" style="display:inline-block;margin-top:10px;padding:7px 14px;background:#1f6feb;color:#fff;border-radius:8px;font-size:13px;text-decoration:none;">Open in Maps ↗</a>'
+      : '';
+    var card = document.createElement('div');
+    card.style.cssText = 'background:#141414;border:1px solid #2a2a2a;border-left:3px solid #00a14b;border-radius:4px 12px 12px 12px;padding:14px 16px;';
+    card.innerHTML =
+      '<div style="display:flex;align-items:center;gap:8px;font-size:15px;color:#f0ece3;font-weight:600;margin-bottom:10px;">' +
+        '<span>' + escapeHtml(w.origin) + '</span>' +
+        '<span style="color:#00a14b;">───▶</span>' +
+        '<span>' + escapeHtml(w.destination) + '</span>' +
+      '</div>' +
+      '<div style="margin-bottom:8px;">' + legsHtml + '</div>' +
+      '<div style="display:flex;gap:16px;font-size:12px;color:#999;">' +
+        (w.distance ? '<span>🛤 ' + escapeHtml(w.distance) + '</span>' : '') +
+        (w.duration ? '<span>⏱ ' + escapeHtml(w.duration) + '</span>' : '') +
+      '</div>' + maps;
+    wrap.appendChild(card);
+    messages.appendChild(wrap);
+    scrollBottom();
+  }
+
+  function appendPlaceCard(w) {
+    var wrap = cardWrap('Qaarib · Place');
+    var stars = w.rating ? '⭐ ' + escapeHtml(w.rating) + (w.rating_count ? ' (' + escapeHtml(w.rating_count) + ')' : '') : '';
+    var price = w.price_level ? '<span style="color:#00a14b;">' + escapeHtml(w.price_level) + '</span>' : '';
+    var maps = w.maps_url ? '<a href="' + escapeHtml(w.maps_url) + '" target="_blank" rel="noopener" style="display:inline-block;margin-top:10px;padding:7px 14px;background:#1f6feb;color:#fff;border-radius:8px;font-size:13px;text-decoration:none;">Directions ↗</a>' : '';
+    var card = document.createElement('div');
+    card.style.cssText = 'background:#141414;border:1px solid #2a2a2a;border-left:3px solid #b8860b;border-radius:4px 12px 12px 12px;padding:14px 16px;';
+    card.innerHTML =
+      '<div style="font-size:15px;color:#f0ece3;font-weight:600;margin-bottom:4px;">' + escapeHtml(w.name) + '</div>' +
+      (w.address ? '<div style="font-size:13px;color:#aaa;margin-bottom:6px;">📍 ' + escapeHtml(w.address) + '</div>' : '') +
+      '<div style="display:flex;gap:14px;font-size:13px;color:#ccc;">' +
+        (stars ? '<span>' + stars + '</span>' : '') + (price ? price : '') +
+      '</div>' + maps;
+    wrap.appendChild(card);
+    messages.appendChild(wrap);
+    scrollBottom();
+  }
+
+  function appendCalendarCard(w) {
+    var wrap = cardWrap('Qaarib · Calendar');
+    var link = w.link ? '<a href="' + escapeHtml(w.link) + '" target="_blank" rel="noopener" style="display:inline-block;margin-top:10px;padding:7px 14px;background:#1f6feb;color:#fff;border-radius:8px;font-size:13px;text-decoration:none;">View event ↗</a>' : '';
+    var card = document.createElement('div');
+    card.style.cssText = 'background:#141414;border:1px solid #2a2a2a;border-left:3px solid #1f6feb;border-radius:4px 12px 12px 12px;padding:14px 16px;';
+    card.innerHTML =
+      '<div style="font-size:15px;color:#f0ece3;font-weight:600;margin-bottom:6px;">📅 ' + escapeHtml(w.title || 'Event') + '</div>' +
+      (w.start ? '<div style="font-size:13px;color:#aaa;">Start: ' + escapeHtml(w.start) + '</div>' : '') +
+      (w.end ? '<div style="font-size:13px;color:#aaa;">End: ' + escapeHtml(w.end) + '</div>' : '') +
+      link;
+    wrap.appendChild(card);
+    messages.appendChild(wrap);
+    scrollBottom();
   }
 
   function appendUserMsg(text) {
