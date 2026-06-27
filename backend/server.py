@@ -5,6 +5,8 @@ from dotenv import load_dotenv
 import os
 import time
 import re
+import threading
+import webbrowser
 
 from fanar_client import ask_fanar_timed
 from chat_session import (
@@ -22,6 +24,8 @@ from rules.local_rules import apply_local_router_rules, get_pre_router_plan, _lo
 from app import run_tools, direct_answer_from_results
 
 BASE_DIR = Path(__file__).resolve().parent
+REPO_ROOT = BASE_DIR.parent
+FRONTEND_INDEX = REPO_ROOT / "frontend" / "index.html"
 load_dotenv(BASE_DIR / ".env")
 load_dotenv()
 
@@ -133,6 +137,25 @@ def _polish_response(response, tool_results=None):
     for bad, good in replacements.items():
         text = text.replace(bad, good)
     return text.strip()
+
+
+def _open_frontend_after_start(port):
+    if os.getenv("QAARIB_AUTO_OPEN_FRONTEND", "1") != "1":
+        return
+
+    def _open():
+        time.sleep(float(os.getenv("QAARIB_AUTO_OPEN_DELAY", "1.2")))
+        try:
+            if FRONTEND_INDEX.exists():
+                webbrowser.open(FRONTEND_INDEX.resolve().as_uri(), new=2)
+                print(f"Opened frontend: {FRONTEND_INDEX}")
+            else:
+                webbrowser.open(f"http://127.0.0.1:{port}", new=2)
+                print(f"frontend/index.html not found; opened backend URL on port {port}")
+        except Exception as exc:
+            print(f"Could not auto-open frontend: {exc}")
+
+    threading.Thread(target=_open, daemon=True).start()
 
 
 @app.route("/health", methods=["GET"])
@@ -255,4 +278,6 @@ def chat():
 
 
 if __name__ == "__main__":
-    app.run(port=int(os.getenv("QAARIB_PORT", "5000")), debug=False)
+    port = int(os.getenv("QAARIB_PORT", "5000"))
+    _open_frontend_after_start(port)
+    app.run(port=port, debug=False)
