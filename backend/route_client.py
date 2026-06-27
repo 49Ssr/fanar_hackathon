@@ -44,10 +44,20 @@ ALIASES = {
     "al shaqab": "Al Shaqab Metro Station, Doha, Qatar",
     "al-shaqab": "Al Shaqab Metro Station, Doha, Qatar",
     "al rayyan al qadeem": "Al Rayyan Al Qadeem Metro Station, Doha, Qatar",
+    "matar qadeem": "Al Matar Al Qadeem Metro Station, Doha, Qatar",
+    "al matar al qadeem": "Al Matar Al Qadeem Metro Station, Doha, Qatar",
+    "old airport": "Al Matar Al Qadeem Metro Station, Doha, Qatar",
+    "family food centre matar qadeem": "Al Matar Al Qadeem Metro Station, Doha, Qatar",
+    "matar qadeem family food centre": "Al Matar Al Qadeem Metro Station, Doha, Qatar",
+    "family food center matar qadeem": "Al Matar Al Qadeem Metro Station, Doha, Qatar",
+    "matar qadeem family food center": "Al Matar Al Qadeem Metro Station, Doha, Qatar",
     "wakra": "Al Wakra Metro Station, Doha, Qatar",
     "al wakra": "Al Wakra Metro Station, Doha, Qatar",
     "ras bu funtas": "Ras Bu Fontas Metro Station, Doha, Qatar",
     "ras bu fontas": "Ras Bu Fontas Metro Station, Doha, Qatar",
+    "ras abu aboud": "Ras Bu Aboud Metro Station, Doha, Qatar",
+    "ras bu aboud": "Ras Bu Aboud Metro Station, Doha, Qatar",
+    "ras bu abboud": "Ras Bu Aboud Metro Station, Doha, Qatar",
     "oqba bin nafe": "Oqba Ibn Nafie Metro Station, Doha, Qatar",
     "oqba ibn nafie": "Oqba Ibn Nafie Metro Station, Doha, Qatar",
     "qnl": "Qatar National Library Metro Station, Doha, Qatar",
@@ -87,7 +97,6 @@ ALIASES = {
     "qatar foundation": "Qatar Foundation, Education City, Doha, Qatar",
     "qf": "Qatar Foundation, Education City, Doha, Qatar",
 }
-
 
 RED_MAIN_NORTH_TO_SOUTH = [
     "Lusail", "Qatar University", "Legtaifiya", "Katara", "Al Qassar", "DECC",
@@ -140,25 +149,44 @@ def _alias_index(data):
     return index
 
 
+def _contains_alias(cleaned, alias):
+    # Do not match tiny aliases like 'qu' inside arbitrary words.
+    if len(alias) <= 3:
+        return re.search(r"\b" + re.escape(alias) + r"\b", cleaned) is not None
+    return alias in cleaned
+
+
 def _transit_node_for(text, data=None):
     data = data or _load_transit_data()
     index = _alias_index(data)
     cleaned = _clean(text)
 
-    # Exact alias first.
     if cleaned in index:
         return index[cleaned]
 
-    # Strip common place suffixes and try again.
     stripped = cleaned
     stripped = re.sub(r"\b(doha|qatar|metro station|station|promenade|terminal 1|t1)\b", " ", stripped)
     stripped = _clean(stripped.strip(" ,."))
     if stripped in index:
         return index[stripped]
 
-    # Longest alias contained in the text.
+    # Hard demo aliases for common spoken place names not always in the graph JSON.
+    hard = {
+        "matar qadeem": "Al Matar Al Qadeem",
+        "al matar al qadeem": "Al Matar Al Qadeem",
+        "old airport": "Al Matar Al Qadeem",
+        "family food centre": "Al Matar Al Qadeem",
+        "family food center": "Al Matar Al Qadeem",
+        "ras abu aboud": "Ras Bu Aboud",
+        "ras bu aboud": "Ras Bu Aboud",
+        "ras bu abboud": "Ras Bu Aboud",
+    }
+    for alias, node in hard.items():
+        if alias in cleaned:
+            return node
+
     for alias, node in sorted(index.items(), key=lambda kv: len(kv[0]), reverse=True):
-        if alias and alias in cleaned:
+        if alias and _contains_alias(cleaned, alias):
             return node
 
     return None
@@ -176,7 +204,7 @@ def canonical_place(text):
         return ALIASES[cleaned]
 
     for key, value in sorted(ALIASES.items(), key=lambda kv: len(kv[0]), reverse=True):
-        if key in cleaned:
+        if _contains_alias(cleaned, key):
             return value
 
     if "qatar" not in cleaned and "doha" not in cleaned:
@@ -354,9 +382,7 @@ def _transit_plan(origin_query, destination_query, requested_mode):
         return None
 
     if origin_node and dest_node:
-        # Same area/node: no transit needed, it's a short local walk.
         if origin_node == dest_node:
-            # Use short readable names from the queries (strip the long resolved suffix).
             o_short = str(origin_query).split(",")[0].strip()
             d_short = str(destination_query).split(",")[0].strip()
             if o_short.lower() == d_short.lower():
@@ -488,7 +514,6 @@ def compute_route(origin_place, destination_place, travel_mode):
 
 def route_plan(query):
     if not GOOGLE_API_KEY:
-        # Transit graph still works without Google key.
         origin_query, destination_query, requested_mode = split_route_query(query)
         transit = _transit_plan(origin_query, destination_query, requested_mode)
         if transit:
@@ -548,6 +573,7 @@ def route_plan(query):
 
 if __name__ == "__main__":
     tests = [
+        "Matar Qadeem Family Food Centre to Ras Abu Aboud by public transport",
         "Al Wakra to Al Rayyan Al Qadeem by public transport",
         "Al Shaqab to Lusail Marina by public transport",
         "Oqba Ibn Nafie to HIA T1 by public transport",
