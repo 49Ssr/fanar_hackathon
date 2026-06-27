@@ -12,6 +12,7 @@ from chat_session import (
 from search_client import web_search
 from places_client import place_search
 from route_client import route_plan
+from route_context_guard import repair_route_query
 from web_scraper_client import web_scrape
 from calendar_client import calendar_event
 from time_task_client import time_task
@@ -117,6 +118,7 @@ def run_tools(router_data, user_prompt, history=""):
                 query = improve_place_query(query, user_prompt, history)
             elif tool == "route_plan":
                 query = improve_route_query(query, user_prompt, history)
+                query = repair_route_query(query, user_prompt, history)
             elif tool == "web_scrape":
                 query = improve_web_scrape_query(query, user_prompt, history)
             elif tool == "calendar_event":
