@@ -14,7 +14,7 @@ from chat_session import (
     load_history,
 )
 from router import build_router_prompt, parse_router_response
-from rules.local_rules import apply_local_router_rules, get_local_direct_answer
+from rules.local_rules import apply_local_router_rules, get_local_direct_answer, get_pre_router_plan
 
 # Reuse the CLI's real execution path instead of maintaining a divergent copy.
 # app.py is safe to import: its CLI loop is under if __name__ == "__main__".
@@ -57,15 +57,49 @@ def chat():
     try:
         history_before_turn = load_history()
 
-        # Pre-router guard: greetings, GPS limitation, identity — never call Fanar.
-        early = get_local_direct_answer(user_prompt, history_before_turn)
-        if early:
-            append_turn(user_prompt, early)
-            return jsonify({"response": early, "timing": {"router_ms": 0, "tool_ms": 0, "responder_ms": 0}})
+        # ── Pre-router deterministic plan ─────────────────────────────────────
+        # Greetings, identity, GPS, current time, calendar creation, and routes
+        # between known Qatar locations are handled WITHOUT calling Fanar. This
+        # is the reliability backbone: these never time out, even if Fanar is down.
+        pre = get_pre_router_plan(user_prompt, history_before_turn)
+        if pre:
+            append_router_decision(pre)
+            if pre.get("direct_answer"):
+                response = str(pre["direct_answer"]).strip()
+            else:
+                tool_start = time.perf_counter()
+                tool_results, active_tool_label, _notes = run_tools(pre, user_prompt, history_before_turn)
+                tool_ms = round((time.perf_counter() - tool_start) * 1000, 2)
+                response = direct_answer_from_results(tool_results, pre)
+                if not response:
+                    # Surface the first tool final_answer/summary deterministically.
+                    parts = [r.get("final_answer") or r.get("summary", "") for r in (tool_results or []) if r.get("final_answer") or r.get("summary")]
+                    response = "\n".join(p for p in parts if p).strip()
+                if not response:
+                    response = "I handled that locally but couldn't compose a result. Try rephrasing the request."
+            append_turn(user_prompt, response)
+            return jsonify({"response": response, "router": pre,
+                            "timing": {"router_ms": 0, "tool_ms": tool_ms, "responder_ms": 0}})
 
-        router_prompt = build_router_prompt(user_prompt, history_before_turn)
-        router_raw, router_ms = ask_fanar_timed(router_prompt, router_model, max_tokens=350)
-        router_data = parse_router_response(router_raw)
+        # ── Fanar router (open-ended intent) ──────────────────────────────────
+        try:
+            router_prompt = build_router_prompt(user_prompt, history_before_turn)
+            router_raw, router_ms = ask_fanar_timed(router_prompt, router_model, max_tokens=350)
+            router_data = parse_router_response(router_raw)
+        except Exception:
+            # Router timed out/failed: fall back to local rules with an empty plan
+            # so transit/place rules can still fire deterministically.
+            router_data = apply_local_router_rules(
+                user_prompt, history_before_turn,
+                {"tools": [], "queries": {}, "reason": "router_fallback", "confidence": 0.0},
+            )
+            router_ms = 0
+            if not router_data.get("tools") and not router_data.get("direct_answer"):
+                fallback = ("Fanar is taking a moment right now. I can still help with specific local tasks: "
+                            "metro routes, current time, calendar events, or named Qatar places. Please restate your request.")
+                append_turn(user_prompt, fallback)
+                return jsonify({"response": fallback, "timing": {"router_ms": router_ms, "tool_ms": 0, "responder_ms": 0}})
+
         router_data = apply_local_router_rules(user_prompt, history_before_turn, router_data)
         append_router_decision(router_data)
 
@@ -87,8 +121,14 @@ def chat():
                 response = deterministic
                 responder_ms = 0
             else:
-                sent_prompt = build_prompt(user_prompt, tool_results=tool_results, active_tool_label=active_tool_label)
-                response, responder_ms = ask_fanar_timed(sent_prompt, responder_model, max_tokens=900)
+                try:
+                    sent_prompt = build_prompt(user_prompt, tool_results=tool_results, active_tool_label=active_tool_label)
+                    response, responder_ms = ask_fanar_timed(sent_prompt, responder_model, max_tokens=900)
+                except Exception:
+                    parts = [r.get("final_answer") or r.get("summary", "") for r in (tool_results or []) if r.get("final_answer") or r.get("summary")]
+                    response = "\n".join(p for p in parts if p).strip() or (
+                        "Fanar is taking a moment. For specific tasks like routes, time, or calendar events, try restating the request directly.")
+                    responder_ms = 0
 
         append_turn(user_prompt, response)
         return jsonify({

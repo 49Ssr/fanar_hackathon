@@ -157,7 +157,9 @@ LOCATION_HINTS = {
     "education city metro": "Education City",
     "education city": "Education City",
     "qcri": "Qatar Computing Research Institute, Education City, Doha, Qatar",
-    "hbku": "HBKU Doha, Qatar",
+    "hbku": "Hamad Bin Khalifa University, Education City, Doha, Qatar",
+    "hbku main branch": "Hamad Bin Khalifa University, Education City, Doha, Qatar",
+    "hamad bin khalifa university": "Hamad Bin Khalifa University, Education City, Doha, Qatar",
     "minaretein": "Minaretein Center, Education City, Doha, Qatar",
     "minaratein": "Minaretein Center, Education City, Doha, Qatar",
     "minareten": "Minaretein Center, Education City, Doha, Qatar",
@@ -364,6 +366,110 @@ def get_local_direct_answer(user_prompt, history=""):
 
     return None
 
+
+TIME_DIRECT_WORDS = [
+    "what time", "time is it", "current time", "time now", "time right now",
+    "what's the time", "whats the time", "time in qatar", "time man", "time bro",
+    "what date", "todays date", "today's date", "what day is it", "from now",
+]
+
+
+def _is_direct_time_request(user_prompt):
+    text = _clean(user_prompt)
+    if any(p in text for p in TIME_DIRECT_WORDS):
+        return True
+    # Bare "time?" / "time"
+    if re.match(r"^time[?!.\s]*$", text):
+        return True
+    return False
+
+
+def _is_generic_known_location_route(user_prompt, history=""):
+    """Route-like prompt that names two known Qatar locations, even without the
+    words 'metro'/'public transport'. e.g. 'go to HBKU, currently in QCRI'.
+    """
+    if not _is_route_like(user_prompt):
+        return False
+    text = _clean(user_prompt)
+    locs = _mentioned_locations(text)
+    if len(_unique_location_values(locs)) >= 2:
+        return True
+    # One location in prompt + an origin/destination recoverable from history.
+    if len(_unique_location_values(locs)) >= 1 and _extract_last_route(history)[0]:
+        return True
+    return False
+
+
+def get_pre_router_plan(user_prompt, history=""):
+    """Deterministic plan produced BEFORE Fanar is called.
+
+    Returns a router_data dict (optionally with 'direct_answer') when the request
+    can be handled with zero model calls, else None. Used identically by app.py
+    and server.py so the CLI and frontend never diverge.
+
+    This is the reliability backbone: greetings, identity, GPS, current time,
+    calendar creation, and routes between known Qatar locations must never depend
+    on Fanar being fast or even reachable.
+    """
+    # 1. Pure direct text answers (greeting/identity/GPS/injection/etc.)
+    answer = get_local_direct_answer(user_prompt, history)
+    if answer:
+        return {
+            "tools": [], "queries": {},
+            "reason": "local_pre_router_direct_answer", "confidence": 1.0,
+            "direct_answer": answer,
+        }
+
+    # 2. Current time / date / relative-time — deterministic in time_task_client.
+    if _is_direct_time_request(user_prompt):
+        return {
+            "tools": ["time_task"],
+            "queries": {"time_task": improve_time_task_query("", user_prompt, history)},
+            "reason": "local_pre_router_time_rule", "confidence": 1.0,
+        }
+
+    # 3. Calendar creation/listing — deterministic parse in calendar_client.
+    if _is_calendar_request(user_prompt, history):
+        # If it also references a URL to scrape, do both.
+        if _is_web_scrape_request(user_prompt, history):
+            return {
+                "tools": ["web_scrape", "calendar_event"],
+                "queries": {
+                    "web_scrape": improve_web_scrape_query("", user_prompt, history),
+                    "calendar_event": improve_calendar_query("", user_prompt, history),
+                },
+                "reason": "local_pre_router_scrape_calendar_rule", "confidence": 1.0,
+            }
+        return {
+            "tools": ["calendar_event"],
+            "queries": {"calendar_event": improve_calendar_query("", user_prompt, history)},
+            "reason": "local_pre_router_calendar_rule", "confidence": 1.0,
+        }
+
+    # 4. Public-transit route (explicit metro/tram/public transport).
+    if _is_public_transit_route(user_prompt, history) or _is_public_transport_followup(user_prompt, history):
+        tools = ["route_plan"]
+        queries = {"route_plan": improve_route_query("", user_prompt, history)}
+        if _needs_live_transit_web(user_prompt):
+            tools.append("web_search")
+            queries["web_search"] = improve_web_query("", user_prompt, history)
+        return {"tools": tools, "queries": queries,
+                "reason": "local_pre_router_transit_rule", "confidence": 1.0}
+
+    # 5. Generic route between two known locations (no 'metro' keyword needed).
+    #    e.g. "i need to go to HBKU, im currently in QCRI, easiest way?"
+    if _is_generic_known_location_route(user_prompt, history):
+        origin, destination = _extract_origin_destination(user_prompt, history)
+        if origin and destination:
+            return {
+                "tools": ["route_plan"],
+                "queries": {"route_plan": f"{origin} to {destination}"},
+                "reason": "local_pre_router_known_route_rule", "confidence": 1.0,
+            }
+
+    return None
+
+
 def force_no_tool(user_prompt):
     text = _clean(user_prompt)
     if not text:
@@ -399,32 +505,70 @@ def _first_location(user_prompt):
     return locs[0][3]
 
 
+def _explicit_origin(text, locs):
+    """Find an origin the user stated explicitly: 'currently in X', 'im in X',
+    'i am at X', 'from X'. Returns the resolved location value or None.
+    """
+    origin_markers = [
+        "currently in", "currently at", "i'm currently in", "im currently in",
+        "i am currently in", "i'm in", "im in", "i am in", "i'm at", "im at",
+        "i am at", "starting from", "start from", "from",
+    ]
+    for marker in origin_markers:
+        for m in re.finditer(re.escape(marker), text):
+            idx = m.end()
+            # First location that begins at/after this origin marker.
+            after = [(s, e, k, v) for s, e, k, v in locs if s >= idx]
+            if after:
+                after.sort(key=lambda t: t[0])
+                return after[0][3], after[0][0]
+    return None, None
+
+
 def _extract_origin_destination(user_prompt, history=""):
     text = _clean(user_prompt)
     locs = _mentioned_locations(text)
     if not locs:
         return None, None
 
-    # Destination: location after the strongest route marker, otherwise last mentioned location.
-    markers = ["need to get to", "need to go to", "have to get to", "want to get to", "go to", "get to", "reach", "to"]
+    # 1. Honour an explicitly stated origin first ("currently in QCRI", "from X").
+    explicit_origin, origin_pos = _explicit_origin(text, locs)
+
+    # 2. Destination: FIRST location after a "go to / get to / reach" marker
+    #    that is not the explicit origin. after[0] (not after[-1]) so that
+    #    "go to HBKU ... currently in QCRI" yields HBKU, not QCRI.
+    dest_markers = ["need to get to", "need to go to", "have to get to",
+                    "want to get to", "going to", "go to", "get to", "reach", "head to", "to"]
     dest = None
     dest_start = None
-    for marker in markers:
-        idx = text.rfind(marker)
+    for marker in dest_markers:
+        idx = text.find(marker)
         if idx != -1:
-            after = [(s, e, k, v) for s, e, k, v in locs if s >= idx]
+            after = [(s, e, k, v) for s, e, k, v in locs if s >= idx + len(marker)]
+            after = [t for t in after if t[3] != explicit_origin]
             if after:
-                dest_start, _, _, dest = after[-1]
+                after.sort(key=lambda t: t[0])
+                dest_start, _, _, dest = after[0]
                 break
     if dest is None:
-        dest_start, _, _, dest = locs[-1]
+        # No usable marker: destination is the last mentioned location that
+        # isn't the explicit origin.
+        candidates = [t for t in locs if t[3] != explicit_origin]
+        if candidates:
+            dest_start, _, _, dest = candidates[-1]
+        else:
+            dest_start, _, _, dest = locs[-1]
 
-    # Origin: last mentioned location before destination. This handles:
-    # "I was at Mesaieed, took taxi to Wakra, need to get to Al Rayyan" -> Wakra.
-    before_dest = [(s, e, k, v) for s, e, k, v in locs if s < dest_start and v != dest]
-    origin = before_dest[-1][3] if before_dest else None
+    # 3. Origin resolution.
+    if explicit_origin and explicit_origin != dest:
+        origin = explicit_origin
+    else:
+        # Last mentioned location before the destination (handles chain routes:
+        # "was at Mesaieed, taxi to Wakra, need to get to Al Rayyan" -> Wakra).
+        before_dest = [(s, e, k, v) for s, e, k, v in locs if s < (dest_start or 0) and v != dest]
+        origin = before_dest[-1][3] if before_dest else None
 
-    # Follow-up fallback from last route history.
+    # 4. Follow-up fallback from last route history.
     if origin is None:
         origin, _old_dest = _extract_last_route(history)
 

@@ -27,6 +27,7 @@ from rules.local_rules import (
     improve_location_resolver_query,
     apply_local_router_rules,
     get_local_direct_answer,
+    get_pre_router_plan,
 )
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
@@ -243,19 +244,45 @@ if __name__ == "__main__":
         try:
             history_before_turn = load_history()
 
-            # Pre-router guard: greetings, GPS, identity — never need Fanar.
-            early = get_local_direct_answer(user_prompt, history_before_turn)
-            if early:
-                response = early
+            # ── Pre-router deterministic plan (identical to server.py) ─────────
+            # Greetings, identity, GPS, current time, calendar creation, and
+            # routes between known locations are handled WITHOUT calling Fanar.
+            pre = get_pre_router_plan(user_prompt, history_before_turn)
+            if pre:
+                append_router_decision(pre)
+                if pre.get("direct_answer"):
+                    response = str(pre["direct_answer"]).strip()
+                else:
+                    tool_results, active_tool_label, _notes = run_tools(pre, user_prompt, history_before_turn)
+                    response = direct_answer_from_results(tool_results, pre)
+                    if not response:
+                        parts = [r.get("final_answer") or r.get("summary", "") for r in (tool_results or []) if r.get("final_answer") or r.get("summary")]
+                        response = "\n".join(p for p in parts if p).strip()
+                    if not response:
+                        response = "I handled that locally but couldn't compose a result. Try rephrasing the request."
                 append_turn(user_prompt, response)
-                print("\nResponse (local):\n")
+                print("\nResponse (pre-router local):\n")
                 print(response)
                 continue
 
-            router_prompt = build_router_prompt(user_prompt, history_before_turn)
-            router_raw, router_ms = ask_fanar_timed(router_prompt, router_model, max_tokens=350)
+            try:
+                router_prompt = build_router_prompt(user_prompt, history_before_turn)
+                router_raw, router_ms = ask_fanar_timed(router_prompt, router_model, max_tokens=350)
+                router_data = parse_router_response(router_raw)
+            except Exception:
+                router_data = apply_local_router_rules(
+                    user_prompt, history_before_turn,
+                    {"tools": [], "queries": {}, "reason": "router_fallback", "confidence": 0.0},
+                )
+                router_ms = 0
+                if not router_data.get("tools") and not router_data.get("direct_answer"):
+                    response = ("Fanar is taking a moment. For specific tasks like routes, time, or "
+                                "calendar events, try restating the request directly.")
+                    append_turn(user_prompt, response)
+                    print("\nResponse (router fallback):\n")
+                    print(response)
+                    continue
 
-            router_data = parse_router_response(router_raw)
             router_data = apply_local_router_rules(user_prompt, history_before_turn, router_data)
 
             append_router_decision(router_data)
@@ -285,8 +312,14 @@ if __name__ == "__main__":
                     response = deterministic
                     responder_ms = 0
                 else:
-                    sent_prompt = build_prompt(user_prompt, tool_results=tool_results, active_tool_label=active_tool_label)
-                    response, responder_ms = ask_fanar_timed(sent_prompt, responder_model, max_tokens=900)
+                    try:
+                        sent_prompt = build_prompt(user_prompt, tool_results=tool_results, active_tool_label=active_tool_label)
+                        response, responder_ms = ask_fanar_timed(sent_prompt, responder_model, max_tokens=900)
+                    except Exception:
+                        parts = [r.get("final_answer") or r.get("summary", "") for r in (tool_results or []) if r.get("final_answer") or r.get("summary")]
+                        response = "\n".join(p for p in parts if p).strip() or (
+                            "Fanar is taking a moment. For specific tasks like routes, time, or calendar events, try restating directly.")
+                        responder_ms = 0
 
             print("responder_ms:", responder_ms)
             print("\nResponse:\n")

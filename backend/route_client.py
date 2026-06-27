@@ -29,6 +29,9 @@ ALIASES = {
     "qcri": "Qatar Computing Research Institute, Education City, Doha, Qatar",
     "qatar computing research institute": "Qatar Computing Research Institute, Education City, Doha, Qatar",
     "hbku qcri": "Qatar Computing Research Institute, Education City, Doha, Qatar",
+    "hbku": "Hamad Bin Khalifa University, Education City, Doha, Qatar",
+    "hbku main branch": "Hamad Bin Khalifa University, Education City, Doha, Qatar",
+    "hamad bin khalifa university": "Hamad Bin Khalifa University, Education City, Doha, Qatar",
     "minaretein": "Minaretein Center, Education City, Doha, Qatar",
     "minaretein center": "Minaretein Center, Education City, Doha, Qatar",
     "minaratein": "Minaretein Center, Education City, Doha, Qatar",
@@ -54,6 +57,35 @@ ALIASES = {
     "hia": "Hamad International Airport Terminal 1, Doha, Qatar",
     "hia t1": "Hamad International Airport Terminal 1, Doha, Qatar",
     "hamad international airport": "Hamad International Airport Terminal 1, Doha, Qatar",
+    "qatar university": "Qatar University Metro Station, Doha, Qatar",
+    "qu": "Qatar University Metro Station, Doha, Qatar",
+    "national museum": "National Museum Metro Station, Doha, Qatar",
+    "national museum of qatar": "National Museum of Qatar, Doha, Qatar",
+    "katara": "Katara Metro Station, Doha, Qatar",
+    "katara cultural village": "Katara Cultural Village, Doha, Qatar",
+    "west bay": "West Bay Metro Station, Doha, Qatar",
+    "dohaexhibition": "DECC Metro Station, Doha, Qatar",
+    "doha exhibition and convention center": "DECC Metro Station, Doha, Qatar",
+    "doha exhibition and convention centre": "DECC Metro Station, Doha, Qatar",
+    "souq waqif": "Souq Waqif Metro Station, Doha, Qatar",
+    "souq": "Souq Waqif Metro Station, Doha, Qatar",
+    "corniche": "Corniche Metro Station, Doha, Qatar",
+    "lusail": "Lusail Metro Station, Doha, Qatar",
+    "the pearl": "The Pearl Island, Doha, Qatar",
+    "pearl qatar": "The Pearl Island, Doha, Qatar",
+    "the pearl qatar": "The Pearl Island, Doha, Qatar",
+    "mia": "Museum of Islamic Art, Doha, Qatar",
+    "museum of islamic art": "Museum of Islamic Art, Doha, Qatar",
+    "mia park": "MIA Park, Doha, Qatar",
+    "villaggio": "Villaggio Mall, Doha, Qatar",
+    "aspire": "Aspire Zone, Doha, Qatar",
+    "aspire zone": "Aspire Zone, Doha, Qatar",
+    "khalifa stadium": "Khalifa International Stadium, Doha, Qatar",
+    "khalifa international stadium": "Khalifa International Stadium, Doha, Qatar",
+    "stadium 974": "Stadium 974, Doha, Qatar",
+    "974 stadium": "Stadium 974, Doha, Qatar",
+    "qatar foundation": "Qatar Foundation, Education City, Doha, Qatar",
+    "qf": "Qatar Foundation, Education City, Doha, Qatar",
 }
 
 
@@ -322,6 +354,30 @@ def _transit_plan(origin_query, destination_query, requested_mode):
         return None
 
     if origin_node and dest_node:
+        # Same area/node: no transit needed, it's a short local walk.
+        if origin_node == dest_node:
+            # Use short readable names from the queries (strip the long resolved suffix).
+            o_short = str(origin_query).split(",")[0].strip()
+            d_short = str(destination_query).split(",")[0].strip()
+            if o_short.lower() == d_short.lower():
+                summary = (f"These resolve to the same {origin_node} area. For the exact building/entrance, "
+                           f"use the Maps link or on-site signage — it's a short local access leg, not a metro journey.")
+            else:
+                summary = (f"{o_short} and {d_short} resolve to the same {origin_node} area. For the exact "
+                           f"entrance, use the Maps link or on-site signage — a short local access leg rather "
+                           f"than a metro journey.")
+            return [{
+                "title": "Short local walk",
+                "origin": origin_node,
+                "destination": dest_node,
+                "recommended_mode": "Walk",
+                "travel_mode": "WALK",
+                "summary": summary,
+                "final_answer": summary + "\n\nMaps backup: " + _maps_url(origin_query, destination_query, "WALK"),
+                "maps_url": _maps_url(origin_query, destination_query, "WALK"),
+                "distance": "same area",
+                "duration": "a few minutes on foot",
+            }]
         path = _shortest_path(data, origin_node, dest_node)
         if path:
             segments = _group_segments(path)
