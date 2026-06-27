@@ -40,7 +40,7 @@ def _clean(text):
 
 
 def _extended_greeting_answer(user_prompt):
-    """Catch natural greetings like 'salam alikum brother how u doing'.
+    """Catch natural greetings like 'ahlan wa sahlan' or 'salam bro'.
 
     These are not worth a Fanar router call during the demo. Keep this narrow so
     real requests that happen to contain 'salam' still route normally.
@@ -48,14 +48,40 @@ def _extended_greeting_answer(user_prompt):
     text = _clean(user_prompt)
     if not text:
         return None
-    tokens = [t.strip("!?.،,;:") for t in text.split()]
-    if len(tokens) > 9:
+    tokens = [t.strip("!?.،,;:") for t in text.split() if t.strip("!?.،,;:")]
+    if len(tokens) > 10:
         return None
-    greeting_start = tokens[0] in {"hi", "hello", "hey", "yo", "salam", "salaam", "assalamu", "hala", "ahlan", "marhaba"}
-    has_how_are_you = any(p in text for p in ["how are you", "how u doing", "how you doing", "how r u", "how are u", "how's it going", "hows it going"])
-    has_salam_pair = ("salam" in tokens or "salaam" in tokens or "assalamu" in tokens) and any(t in {"alaikum", "alaykum", "alikum"} for t in tokens)
-    if greeting_start and (has_how_are_you or has_salam_pair):
-        return "Wa alaikum assalam — doing good. I’m Qaarib, ready for Qatar routes, places, events, and quick local help."
+
+    greeting_tokens = {
+        "hi", "hello", "hey", "yo", "salam", "salaam", "assalamu", "hala",
+        "ahlan", "ahlaan", "marhaba", "sahlan", "sahla", "sahlain"
+    }
+    filler_tokens = {
+        "wa", "wala", "w", "bro", "brother", "habibi", "akhi", "man", "dear",
+        "how", "are", "you", "u", "r", "doing", "going", "it", "is", "things"
+    }
+    route_or_task_words = {
+        "route", "routes", "metro", "tram", "bus", "calendar", "event", "events",
+        "where", "how", "get", "go", "from", "to", "near", "nearby", "food", "eat", "restaurant"
+    }
+
+    has_greeting = any(t in greeting_tokens for t in tokens)
+    greeting_start = tokens and tokens[0] in greeting_tokens
+    has_how_are_you = any(p in text for p in [
+        "how are you", "how u doing", "how you doing", "how r u", "how are u",
+        "how's it going", "hows it going"
+    ])
+    has_salam_pair = ("salam" in tokens or "salaam" in tokens or "assalamu" in tokens) and any(
+        t in {"alaikum", "alaykum", "alikum"} for t in tokens
+    )
+    has_ahlan_sahlan = ("ahlan" in tokens or "ahlaan" in tokens) and any(t.startswith("sahl") for t in tokens)
+
+    # Pure greeting: all tokens are greeting/filler words, with no actual local task.
+    pure_greeting = has_greeting and all((t in greeting_tokens or t in filler_tokens or t in {"alaikum", "alaykum", "alikum"}) for t in tokens)
+    if greeting_start and (has_how_are_you or has_salam_pair or has_ahlan_sahlan or pure_greeting):
+        if has_salam_pair:
+            return "Wa alaikum assalam — I’m Qaarib, ready for Qatar routes, places, events, and quick local help."
+        return "Ahlan wa sahlan — I’m Qaarib, ready for Qatar routes, places, events, and quick local help."
     return None
 
 
