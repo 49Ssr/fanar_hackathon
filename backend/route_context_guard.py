@@ -61,7 +61,18 @@ def locations_in(text):
     return sorted(found, key=lambda x: x[0])
 
 
+def current_location_from_context(text):
+    # Matches server-injected block: lat=25.123456 lng=51.123456
+    m = re.search(r"lat=([-+]?\d+(?:\.\d+)?)\s+lng=([-+]?\d+(?:\.\d+)?)", text or "", flags=re.I)
+    if not m:
+        return None
+    return f"{m.group(1)},{m.group(2)}"
+
+
 def latest_user_location(history):
+    coord = current_location_from_context(history)
+    if coord:
+        return coord
     users = re.findall(r"\[USER\]\s*\n(.*?)(?=\n\[ASSISTANT\]|\n\n\[|$)", history or "", flags=re.S)
     for msg in reversed(users):
         locs = locations_in(msg)
@@ -103,12 +114,6 @@ def has_here_marker(prompt):
 
 
 def repair_route_query(query, user_prompt, history=""):
-    """Prevent stale route history from poisoning 'from here' route requests.
-
-    local_rules.py may build a query using the last route origin when the prompt
-    says 'from here'. This guard prefers the latest explicit user location in
-    chat history, e.g. 'I'm stuck in Msheireb' -> origin=Msheireb.
-    """
     destination = destination_from_prompt(user_prompt)
     if not destination:
         return query
