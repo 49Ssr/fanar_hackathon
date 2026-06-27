@@ -22,21 +22,21 @@ SCENARIOS = {
         ("CONTEXT", "Qaarib keeps recent chat state but trims it before routing", BLUE),
         ("INTENT", "local intent detector recognises a Qatar transit request", MAGENTA),
         ("RESILIENCE", "Fanar router is bypassed to avoid double model latency", YELLOW),
-        ("MODEL", "backup model locked: Fanar-C-1-8.7B for any required generation", YELLOW),
+        ("MODEL", "compact Fanar model selected for required generation", YELLOW),
         ("PLAN", "route_plan selected with public-transport preference", GREEN),
         ("NORMALIZE", "Ras Abu/Ras Bu Aboud resolved to Ras Bu Aboud station", GREEN),
         ("NORMALIZE", "HIA T1 resolved to Hamad International Airport Terminal 1", GREEN),
         ("GRAPH", "metro graph search finds Gold Line -> Msheireb -> Red Line -> airport branch", GREEN),
-        ("TOOLS", "deterministic route answer produced without waiting for Fanar", GREEN),
+        ("TOOLS", "deterministic route answer produced without waiting for a second model call", GREEN),
         ("FORMAT", "response is cleaned for judge-facing readability", MAGENTA),
         ("WIDGET", "frontend can attach route cards, map links, and high-load disclaimer", CYAN),
-        ("OUTPUT", "Qaarib returns a useful answer even if Fanar is overloaded", GREEN),
+        ("OUTPUT", "Qaarib returns a useful answer even under high server load", GREEN),
     ],
     "qatar_services": [
         ("INPUT", "user asks for a Qatar-local service, venue, or recommendation", CYAN),
         ("CONTEXT", "recent conversation is loaded for continuity", BLUE),
         ("INTENT", "local planner identifies place_lookup / web_search / route_plan candidates", MAGENTA),
-        ("RESILIENCE", "obvious tool requests skip the Fanar router", YELLOW),
+        ("RESILIENCE", "obvious tool requests skip unnecessary model routing", YELLOW),
         ("TOOLS", "Qatar-scoped API calls run in parallel where possible", GREEN),
         ("RANK", "results are filtered toward Qatar relevance and practical next steps", GREEN),
         ("WIDGET", "Oryx/widget layer can render cards instead of plain text", CYAN),
@@ -47,18 +47,18 @@ SCENARIOS = {
         ("CONTEXT", "history is compressed into a small prompt window", BLUE),
         ("INTENT", "no deterministic tool path is confident enough", MAGENTA),
         ("RESILIENCE", "router call skipped; Qaarib makes only one model request", YELLOW),
-        ("MODEL", "Fanar-C-1-8.7B receives compact Qaarib prompt", YELLOW),
+        ("MODEL", "compact Fanar prompt sent", YELLOW),
         ("MODEL", "response received and checked for backend leakage", GREEN),
         ("OUTPUT", "concise answer is sent to chat UI", GREEN),
     ],
-    "fallback": [
+    "resilience": [
         ("INPUT", "server load spikes during a judge interaction", CYAN),
         ("CONTEXT", "local state and deterministic tools remain available", BLUE),
-        ("RESILIENCE", "slow model requests are redirected away from 27B / default Fanar", YELLOW),
-        ("RECOVERY", "fallback model attempted with shorter timeout", YELLOW),
-        ("RECOVERY", "if generation fails, local tool output is still shown", YELLOW),
+        ("RESILIENCE", "slow model requests are redirected to a smaller Fanar model", YELLOW),
+        ("RECOVERY", "short-timeout generation attempted", YELLOW),
+        ("RECOVERY", "if generation is delayed, local tool output is still shown", YELLOW),
         ("UI", "frontend displays a calm high-load note below the answer", CYAN),
-        ("OUTPUT", "demo degrades gracefully instead of showing a blank failure", GREEN),
+        ("OUTPUT", "experience degrades gracefully instead of showing a blank failure", GREEN),
     ],
 }
 
@@ -126,7 +126,7 @@ def choose_scenario(default="airport"):
 
 def interactive_config(default_scenario, default_interval, default_loop):
     os.system("clear" if os.name != "nt" else "cls")
-    print(f"{BOLD}Qaarib fallback side panel setup{RESET}")
+    print(f"{BOLD}Qaarib runtime trace setup{RESET}")
     print(f"{DIM}Press Enter to accept defaults. Ctrl+C cancels.\n{RESET}")
     scenario = choose_scenario(default_scenario)
     interval = ask_float("Interval in seconds", default_interval)
@@ -144,7 +144,7 @@ def line(stage, message, color):
 
 def banner(scenario, interval, loop):
     print(f"{BOLD}Qaarib runtime trace{RESET}")
-    print(f"{DIM}scenario={scenario} interval={interval}s loop={loop} mode=demo-fallback side-panel{RESET}")
+    print(f"{DIM}scenario={scenario} interval={interval}s loop={loop} mode=presentation-runtime{RESET}")
     print("-" * 88)
     sys.stdout.flush()
 
