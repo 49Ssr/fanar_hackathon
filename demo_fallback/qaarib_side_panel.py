@@ -85,15 +85,66 @@ def now():
     return datetime.now().strftime("%H:%M:%S")
 
 
+def ask_float(prompt, default):
+    raw = input(f"{prompt} [{default}]: ").strip()
+    if not raw:
+        return default
+    try:
+        value = float(raw)
+        return max(0.5, value)
+    except ValueError:
+        print("Invalid number, using default.")
+        return default
+
+
+def ask_bool(prompt, default):
+    default_text = "Y/n" if default else "y/N"
+    raw = input(f"{prompt} [{default_text}]: ").strip().lower()
+    if not raw:
+        return default
+    return raw in {"y", "yes", "1", "true", "on"}
+
+
+def choose_scenario(default="airport"):
+    names = list(SCENARIOS.keys())
+    print("\nScenarios:")
+    for i, name in enumerate(names, 1):
+        marker = "*" if name == default else " "
+        print(f"  {i}. {name} {marker}")
+    raw = input(f"Scenario [{default}]: ").strip()
+    if not raw:
+        return default
+    if raw.isdigit():
+        idx = int(raw) - 1
+        if 0 <= idx < len(names):
+            return names[idx]
+    if raw in SCENARIOS:
+        return raw
+    print("Invalid scenario, using default.")
+    return default
+
+
+def interactive_config(default_scenario, default_interval, default_loop):
+    os.system("clear" if os.name != "nt" else "cls")
+    print(f"{BOLD}Qaarib fallback side panel setup{RESET}")
+    print(f"{DIM}Press Enter to accept defaults. Ctrl+C cancels.\n{RESET}")
+    scenario = choose_scenario(default_scenario)
+    interval = ask_float("Interval in seconds", default_interval)
+    loop = ask_bool("Loop trace", default_loop)
+    input("\nPress Enter to start...")
+    os.system("clear" if os.name != "nt" else "cls")
+    return scenario, interval, loop
+
+
 def line(stage, message, color):
     latency = random.randint(24, 920)
     pid = os.getpid()
     return f"{DIM}{now()}{RESET} {color}{stage:<10}{RESET} {message} {DIM}pid={pid} latency={latency}ms{RESET}"
 
 
-def banner(scenario, interval):
+def banner(scenario, interval, loop):
     print(f"{BOLD}Qaarib runtime trace{RESET}")
-    print(f"{DIM}scenario={scenario} interval={interval}s mode=demo-fallback side-panel{RESET}")
+    print(f"{DIM}scenario={scenario} interval={interval}s loop={loop} mode=demo-fallback side-panel{RESET}")
     print("-" * 88)
     sys.stdout.flush()
 
@@ -111,15 +162,24 @@ def main():
     parser.add_argument("--scenario", choices=sorted(SCENARIOS), default="airport")
     parser.add_argument("--interval", type=float, default=7.0)
     parser.add_argument("--loop", action="store_true")
+    parser.add_argument("--no-loop", action="store_true")
     parser.add_argument("--no-color", action="store_true")
+    parser.add_argument("--no-menu", action="store_true")
     args = parser.parse_args()
 
     global RESET, DIM, BOLD, CYAN, GREEN, YELLOW, MAGENTA, BLUE, RED
     if args.no_color:
         RESET = DIM = BOLD = CYAN = GREEN = YELLOW = MAGENTA = BLUE = RED = ""
 
-    banner(args.scenario, args.interval)
-    stream_events(SCENARIOS[args.scenario], args.interval, args.loop)
+    scenario = args.scenario
+    interval = max(0.5, args.interval)
+    loop = args.loop and not args.no_loop
+
+    if not args.no_menu:
+        scenario, interval, loop = interactive_config(scenario, interval, loop)
+
+    banner(scenario, interval, loop)
+    stream_events(SCENARIOS[scenario], interval, loop)
 
 
 if __name__ == "__main__":
