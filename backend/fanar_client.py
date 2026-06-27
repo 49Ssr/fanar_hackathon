@@ -11,10 +11,10 @@ load_dotenv()
 API_KEY=os.getenv("FANAR_API_KEY")
 
 
-# Router calls need a faster fail-fast timeout than responder calls.
-# Responder may produce longer outputs; router only returns ~350 tokens of JSON.
-ROUTER_TIMEOUT = int(os.getenv("FANAR_ROUTER_TIMEOUT", "15"))
-RESPONDER_TIMEOUT = int(os.getenv("FANAR_RESPONDER_TIMEOUT", "30"))
+# Demo-safe defaults. Long 27B generations can stall the live UI; the backend now
+# prefers one shorter Fanar call for composition and deterministic tools for routing.
+ROUTER_TIMEOUT = int(os.getenv("FANAR_ROUTER_TIMEOUT", "8"))
+RESPONDER_TIMEOUT = int(os.getenv("FANAR_RESPONDER_TIMEOUT", "18"))
 
 
 def ask_fanar(prompt:str, model:str, max_tokens=700, timeout=None):
