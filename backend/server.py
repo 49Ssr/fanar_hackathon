@@ -19,8 +19,6 @@ from chat_session import (
 from router import build_router_prompt, parse_router_response
 from rules.local_rules import apply_local_router_rules, get_pre_router_plan, _local_rule_plan
 
-# Reuse the CLI's real execution path instead of maintaining a divergent copy.
-# app.py is safe to import: its CLI loop is under if __name__ == "__main__".
 from app import run_tools, direct_answer_from_results
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -30,10 +28,9 @@ load_dotenv(BASE_DIR / ".env")
 load_dotenv()
 
 flask_app = Flask(__name__)
-app = flask_app  # keep the conventional name for Flask runners
+app = flask_app
 CORS(app)
 
-# Hackathon load fallback: organisers recommended the ~9B model while Fanar is overloaded.
 FANAR_9B_MODEL = "Fanar-C-1-8.7B"
 router_model = os.getenv("FANAR_ROUTER_MODEL", FANAR_9B_MODEL)
 responder_model = os.getenv("FANAR_RESPONDER_MODEL", FANAR_9B_MODEL)
@@ -47,9 +44,11 @@ def _clean(text):
 def _compact_fanar_prompt(user_prompt, history=""):
     recent = history[-1200:] if history else ""
     return f"""
-You are Qaarib, a Qatar-focused assistant for the Fanar Hackathon.
-Be concise, helpful, and practical. Default to English. Do not mention backend/tool failures.
-For Qatar questions, stay Qatar-local. If unsure, say what to check next.
+You are Qaarib, a Qatar-local assistant.
+Sound like a switched-on local helper: warm, practical, brief, not corporate.
+Do not say "I understand" or "let me know if you need anything else".
+Prefer: "Best move:", "Easy one:", "Heads up:", "Worth checking:".
+Stay Qatar-local. Do not mention provider failover, APIs, backend issues, or internal routing.
 
 Recent context:
 {recent if recent else "No previous context."}
@@ -60,7 +59,6 @@ Qaarib:
 
 
 def _extended_greeting_answer(user_prompt):
-    """Catch natural greetings like 'ahlan wa sahlan' or 'salam bro'."""
     text = _clean(user_prompt)
     if not text:
         return None
@@ -91,17 +89,12 @@ def _extended_greeting_answer(user_prompt):
 
     if greeting_start and (has_how_are_you or has_salam_pair or has_ahlan_sahlan or pure_greeting):
         if has_salam_pair:
-            return "Wa alaikum assalam — I’m Qaarib, ready for Qatar routes, places, events, and quick local help."
-        return "Ahlan wa sahlan — I’m Qaarib, ready for Qatar routes, places, events, and quick local help."
+            return "Wa alaikum assalam — Qaarib here. Tell me where you are and where you’re trying to go; I’ll sort the Qatar route or place angle."
+        return "Ahlan — Qaarib here. Give me the place, route, or plan, and I’ll make it practical for Qatar."
     return None
 
 
 def _polish_response(response, tool_results=None):
-    """Final presentation cleanup for fragile deterministic route text.
-
-    This does not call Fanar. It just removes the ugly repeated transfer wording
-    from route_plan so the frontend bubble reads cleanly under demo pressure.
-    """
     text = (response or "").strip()
     route = None
     for item in tool_results or []:
@@ -113,17 +106,21 @@ def _polish_response(response, tool_results=None):
         origin = route.get("origin", "")
         destination = route.get("destination", "")
         maps_url = route.get("maps_url", "")
+        if origin == "Msheireb" and destination == "Souq Waqif":
+            text = "Easy one — from Msheireb, take the Gold Line eastbound one stop to Souq Waqif. If you’re already above ground in Msheireb Downtown, walking may be quicker; use the map for the exact exit."
+            if maps_url:
+                text += f"\n\nMap: {maps_url}"
+            return text
         if origin == "Ras Bu Aboud" and destination == "Hamad International Airport T1":
             text = (
-                "Cheapest route: use the metro instead of a taxi.\n"
-                "1. Start at Ras Bu Aboud station.\n"
-                "2. Take the Gold Line westbound to Msheireb.\n"
-                "3. At Msheireb, transfer to the Red Line southbound and ride to Oqba Ibn Nafie.\n"
-                "4. From Oqba Ibn Nafie, take the airport branch to Hamad International Airport T1.\n"
-                "Check live Qatar Rail timings and airport signage before you tap in."
+                "Best move: metro, not taxi.\n"
+                "1. Ras Bu Aboud → Msheireb on the Gold Line.\n"
+                "2. Msheireb → Oqba Ibn Nafie on the Red Line.\n"
+                "3. Follow the HIA T1 airport branch to the terminal.\n"
+                "Check live Qatar Rail signs before tapping in."
             )
             if maps_url:
-                text += f"\n\nMaps backup: {maps_url}"
+                text += f"\n\nMap: {maps_url}"
             return text
 
     replacements = {
@@ -132,7 +129,9 @@ def _polish_response(response, tool_results=None):
         "Continue through Oqba Ibn Nafie. Take Red Line airport branch toward HIA T1 to Hamad International Airport T1.":
             "From Oqba Ibn Nafie, take the airport branch to Hamad International Airport T1.",
         "Quick route: Use public transport for this one.":
-            "Cheapest route: use metro/public transport instead of taxis.",
+            "Best move: use metro/public transport.",
+        "I understand that ": "",
+        "Let me know if there's anything else I can assist with!": "",
     }
     for bad, good in replacements.items():
         text = text.replace(bad, good)
@@ -257,7 +256,7 @@ def chat():
                 except Exception:
                     parts = [r.get("final_answer") or r.get("summary", "") for r in (tool_results or []) if r.get("final_answer") or r.get("summary")]
                     response = "\n".join(p for p in parts if p).strip() or (
-                        "I’m under heavy load right now, but I can still help fastest with routes, places, time, and calendar tasks. Try a direct Qatar-local request."
+                        "Heads up — model is slow right now. Routes, places, time, and calendar tasks still work best if you ask directly."
                     )
                     responder_ms = 0
 
