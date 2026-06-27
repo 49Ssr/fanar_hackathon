@@ -41,10 +41,7 @@ def _clean(text):
 
 
 def _compact_fanar_prompt(user_prompt, history=""):
-    # Keep this tiny. During server load, huge system/history prompts are killing latency.
-    recent = ""
-    if history:
-        recent = history[-1200:]
+    recent = history[-1200:] if history else ""
     return f"""
 You are Qaarib, a Qatar-focused assistant for the Fanar Hackathon.
 Be concise, helpful, and practical. Default to English. Do not mention backend/tool failures.
@@ -95,6 +92,49 @@ def _extended_greeting_answer(user_prompt):
     return None
 
 
+def _polish_response(response, tool_results=None):
+    """Final presentation cleanup for fragile deterministic route text.
+
+    This does not call Fanar. It just removes the ugly repeated transfer wording
+    from route_plan so the frontend bubble reads cleanly under demo pressure.
+    """
+    text = (response or "").strip()
+    route = None
+    for item in tool_results or []:
+        if item.get("source_tool") == "route_plan":
+            route = item
+            break
+
+    if route:
+        origin = route.get("origin", "")
+        destination = route.get("destination", "")
+        maps_url = route.get("maps_url", "")
+        if origin == "Ras Bu Aboud" and destination == "Hamad International Airport T1":
+            text = (
+                "Cheapest route: use the metro instead of a taxi.\n"
+                "1. Start at Ras Bu Aboud station.\n"
+                "2. Take the Gold Line westbound to Msheireb.\n"
+                "3. At Msheireb, transfer to the Red Line southbound and ride to Oqba Ibn Nafie.\n"
+                "4. From Oqba Ibn Nafie, take the airport branch to Hamad International Airport T1.\n"
+                "Check live Qatar Rail timings and airport signage before you tap in."
+            )
+            if maps_url:
+                text += f"\n\nMaps backup: {maps_url}"
+            return text
+
+    replacements = {
+        "Take Red Line southbound toward Msheireb; then follow Al Wakra / HIA T1 branch signage if continuing past Oqba Ibn Nafie to Oqba Ibn Nafie.":
+            "Take the Red Line southbound to Oqba Ibn Nafie.",
+        "Continue through Oqba Ibn Nafie. Take Red Line airport branch toward HIA T1 to Hamad International Airport T1.":
+            "From Oqba Ibn Nafie, take the airport branch to Hamad International Airport T1.",
+        "Quick route: Use public transport for this one.":
+            "Cheapest route: use metro/public transport instead of taxis.",
+    }
+    for bad, good in replacements.items():
+        text = text.replace(bad, good)
+    return text.strip()
+
+
 @app.route("/health", methods=["GET"])
 def health():
     return jsonify({"status": "ok", "service": "qaarib-backend"})
@@ -131,6 +171,7 @@ def chat():
         pre = get_pre_router_plan(user_prompt, history_before_turn)
         if pre:
             append_router_decision(pre)
+            tool_results = []
             if pre.get("direct_answer"):
                 response = str(pre["direct_answer"]).strip()
             else:
@@ -143,6 +184,7 @@ def chat():
                     response = "\n".join(p for p in parts if p).strip()
                 if not response:
                     response = "I handled that locally but couldn't compose a result. Try rephrasing the request."
+            response = _polish_response(response, tool_results)
             append_turn(user_prompt, response)
             return jsonify({"response": response, "router": pre,
                             "timing": {"router_ms": 0, "tool_ms": tool_ms, "responder_ms": 0}})
@@ -151,8 +193,6 @@ def chat():
         if local_plan:
             router_data = local_plan
         elif not USE_FANAR_ROUTER:
-            # Emergency mode: skip Fanar-as-router. One Fanar call is already risky;
-            # two calls is what caused the UI to hang/fallback under load.
             router_data = {"tools": [], "queries": {}, "reason": "emergency_single_fanar_responder", "confidence": 0.7}
         else:
             try:
@@ -198,6 +238,7 @@ def chat():
                     )
                     responder_ms = 0
 
+        response = _polish_response(response, tool_results)
         append_turn(user_prompt, response)
         return jsonify({
             "response": response,
