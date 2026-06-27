@@ -11,26 +11,36 @@ load_dotenv()
 API_KEY=os.getenv("FANAR_API_KEY")
 
 
-def ask_fanar(prompt:str,model:str,max_tokens=700):
+# Router calls need a faster fail-fast timeout than responder calls.
+# Responder may produce longer outputs; router only returns ~350 tokens of JSON.
+ROUTER_TIMEOUT = int(os.getenv("FANAR_ROUTER_TIMEOUT", "30"))
+RESPONDER_TIMEOUT = int(os.getenv("FANAR_RESPONDER_TIMEOUT", "60"))
+
+
+def ask_fanar(prompt:str, model:str, max_tokens=700, timeout=None):
     if not API_KEY:
         raise RuntimeError("FANAR_API_KEY is missing. Put it in backend/.env")
 
+    if timeout is None:
+        # Infer from max_tokens: short router calls get the faster timeout.
+        timeout = ROUTER_TIMEOUT if max_tokens <= 400 else RESPONDER_TIMEOUT
+
     headers={
-        "Authorization":f"Bearer {API_KEY}",
-        "Content-Type":"application/json",
+        "Authorization": f"Bearer {API_KEY}",
+        "Content-Type": "application/json",
     }
 
     payload={
-        "model":model,
-        "messages":[{"role":"user","content":prompt}],
-        "max_tokens":max_tokens,
+        "model": model,
+        "messages": [{"role": "user", "content": prompt}],
+        "max_tokens": max_tokens,
     }
 
     response=requests.post(
         "https://api.fanar.qa/v1/chat/completions",
         json=payload,
         headers=headers,
-        timeout=60,
+        timeout=timeout,
     )
 
     response.raise_for_status()
@@ -38,8 +48,8 @@ def ask_fanar(prompt:str,model:str,max_tokens=700):
     return data["choices"][0]["message"]["content"]
 
 
-def ask_fanar_timed(prompt:str,model:str,max_tokens=700):
+def ask_fanar_timed(prompt:str, model:str, max_tokens=700, timeout=None):
     start=time.perf_counter()
-    response=ask_fanar(prompt,model,max_tokens)
+    response=ask_fanar(prompt, model, max_tokens, timeout=timeout)
     elapsed_ms=round((time.perf_counter()-start)*1000,2)
-    return response,elapsed_ms
+    return response, elapsed_ms

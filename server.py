@@ -14,7 +14,7 @@ from chat_session import (
     load_history,
 )
 from router import build_router_prompt, parse_router_response
-from rules.local_rules import apply_local_router_rules, get_local_direct_answer
+from rules.local_rules import apply_local_router_rules
 
 # Reuse the CLI's real execution path instead of maintaining a divergent copy.
 # app.py is safe to import: its CLI loop is under if __name__ == "__main__".
@@ -57,12 +57,6 @@ def chat():
     try:
         history_before_turn = load_history()
 
-        # Pre-router guard: greetings, GPS limitation, identity — never call Fanar.
-        early = get_local_direct_answer(user_prompt, history_before_turn)
-        if early:
-            append_turn(user_prompt, early)
-            return jsonify({"response": early, "timing": {"router_ms": 0, "tool_ms": 0, "responder_ms": 0}})
-
         router_prompt = build_router_prompt(user_prompt, history_before_turn)
         router_raw, router_ms = ask_fanar_timed(router_prompt, router_model, max_tokens=350)
         router_data = parse_router_response(router_raw)
@@ -101,13 +95,7 @@ def chat():
             },
         })
     except Exception as e:
-        err_str = str(e)
-        if "timed out" in err_str.lower() or "timeout" in err_str.lower() or "connectionpool" in err_str.lower():
-            msg = "Fanar is taking a moment to respond. Try a more specific request or retry shortly."
-            return jsonify({"error": msg}), 503
-        # Strip raw Python exception internals before sending to frontend
-        safe = err_str.split("\n")[0][:200] if err_str else "An unexpected error occurred."
-        return jsonify({"error": safe}), 500
+        return jsonify({"error": str(e)}), 500
 
 
 if __name__ == "__main__":

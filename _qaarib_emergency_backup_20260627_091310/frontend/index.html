@@ -837,8 +837,6 @@
 
   let chatStarted = false;
 
-  const API_BASE = window.QAARIB_API_BASE || 'http://localhost:5000';
-
   const avatarMenu = document.getElementById('avatarMenu');
 
   function toggleAvatarMenu(e) {
@@ -889,7 +887,7 @@
     const typingEl = appendTyping();
     scrollBottom();
 
-    fetch(API_BASE + '/chat', {
+    fetch('http://localhost:5000/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ message: text })
@@ -1002,7 +1000,6 @@
   }
 
   function newChat() {
-    fetch(API_BASE + '/reset', { method: 'POST' }).catch(function () {});
     messages.innerHTML = '';
     messages.classList.remove('visible');
     hero.classList.remove('hidden');

@@ -4,19 +4,16 @@ import datetime
 from openai import OpenAI
 from dotenv import load_dotenv
 
-# Keep imports package-safe for Qaarib.
-# Ahmed's original standalone agent used sys.path insertion to import
-# datetime/resolve_datetime.py, which works at runtime in some folders but
-# breaks Pylance and is fragile inside a larger backend.
+load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
+load_dotenv()
+
 from .datetime.resolve_datetime import resolve_datetime
 
-load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
-
 client = OpenAI(
-    base_url="https://api.fanar.qa/v1",
-    api_key=os.getenv("FANAR_API_KEY"),
+    base_url=os.getenv("BASE_URL", "https://api.fanar.qa/v1"),
+    api_key=os.getenv("FANAR_API_KEY") or os.getenv("API_KEY"),
 )
-model_name = "Fanar"
+model_name = os.getenv("MODEL_NAME", "Fanar")
 
 
 def get_system_prompt(reference_date=None, reference_day=None):
@@ -24,7 +21,15 @@ def get_system_prompt(reference_date=None, reference_day=None):
         today = datetime.date.today()
         reference_date = today.strftime("%Y-%m-%d")
         reference_day = today.strftime("%A")
-    return f"""You are a calendar assistant for the Fanar Arabic AI platform.
+    return f"""STRICT RULES — READ BEFORE ANYTHING ELSE:
+1. You MUST return a JSON object for every single query. No exceptions.
+2. You are FORBIDDEN from calculating dates, times, or days yourself.
+3. You are FORBIDDEN from answering any question in plain text.
+4. Your ONLY job is to classify the query into an intent and extract the date/time expression exactly as the user said it.
+5. For ANY query involving a date, time, or day — extract the expression into the correct slot and return JSON. NEVER calculate. NEVER answer in prose.
+6. If a query does not match any intent, return exactly: {{"intent": null, "sub_intent": null, "slots": {{}}}}
+
+You are a calendar assistant for the Fanar Arabic AI platform.
 Extract the intent, sub-intent, and slots from the user message.
 Return ONLY a JSON object with no explanation, no markdown, nothing else.
 Always use HH:MM 24-hour format for time slots (e.g. 15:00, 09:30).
@@ -88,15 +93,32 @@ User: "Remind me 30 minutes before the team call"
 Output: {{"intent":"Reminder","sub_intent":"Before event","slots":{{"title":"Team call","remind_before":30,"repeat":false,"action":"SET_REMINDER"}}}}
 
 ### Query
-Use when the user wants to see or list their schedule.
-Sub-intents: Today's tasks, Daily summary, This week, Specific event, This month
+Use when the user wants to see or list their schedule, OR when the user asks about a specific date or day.
+Sub-intents: Today's tasks, Daily summary, This week, This month, Specific event
 Slots: title, date, action
 Action value: QUERY
 If the user asks about a range like "this week" or "next week", set date to null.
+For date questions like "what day is it after 3 days" or "what is today", use sub_intent "Specific event" and put the date expression in the date slot exactly as the user said it.
 
 Example:
 User: "What do I have this week?"
 Output: {{"intent":"Query","sub_intent":"This week","slots":{{"title":null,"date":null,"action":"QUERY"}}}}
+
+Example:
+User: "what day is it after 3 days"
+Output: {{"intent":"Query","sub_intent":"Specific event","slots":{{"title":null,"date":"in 3 days","action":"QUERY"}}}}
+
+Example:
+User: "what is today"
+Output: {{"intent":"Query","sub_intent":"Daily summary","slots":{{"title":null,"date":"today","action":"QUERY"}}}}
+
+Example:
+User: "what day is next Monday"
+Output: {{"intent":"Query","sub_intent":"Specific event","slots":{{"title":null,"date":"next Monday","action":"QUERY"}}}}
+
+Example:
+User: "what is the date in 2 weeks"
+Output: {{"intent":"Query","sub_intent":"Specific event","slots":{{"title":null,"date":"in 2 weeks","action":"QUERY"}}}}
 
 ### Check Availability
 Use when the user wants to know if they are free at a certain time.
@@ -130,7 +152,6 @@ def _resolve_slots(slots: dict, ref_date: datetime.date, ref_time: datetime.time
         if date_val is None and time_val is None:
             continue
 
-        # Combine into one expression if both present
         if date_val and time_val:
             expression = f"{date_val} at {time_val}"
         elif date_val:
@@ -192,6 +213,18 @@ def run(utterance: str, context: dict = None) -> dict:
     try:
         result = json.loads(raw)
     except Exception:
+        # Fanar returned prose — try resolve_datetime on the full query as fallback
+        dt_result = resolve_datetime(utterance, ref_date, ref_time)
+        if dt_result["status"] == "ok" and dt_result["date_start"]:
+            return {
+                "intent": "Query",
+                "sub_intent": "Specific event",
+                "slots": {
+                    "title": None,
+                    "date": dt_result["date_start"],
+                    "action": "QUERY"
+                }
+            }
         return {
             "intent": None,
             "sub_intent": None,

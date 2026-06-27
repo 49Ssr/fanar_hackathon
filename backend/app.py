@@ -26,6 +26,7 @@ from rules.local_rules import (
     improve_time_task_query,
     improve_location_resolver_query,
     apply_local_router_rules,
+    get_local_direct_answer,
 )
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
@@ -241,6 +242,15 @@ if __name__ == "__main__":
 
         try:
             history_before_turn = load_history()
+
+            # Pre-router guard: greetings, GPS, identity — never need Fanar.
+            early = get_local_direct_answer(user_prompt, history_before_turn)
+            if early:
+                response = early
+                append_turn(user_prompt, response)
+                print("\nResponse (local):\n")
+                print(response)
+                continue
 
             router_prompt = build_router_prompt(user_prompt, history_before_turn)
             router_raw, router_ms = ask_fanar_timed(router_prompt, router_model, max_tokens=350)

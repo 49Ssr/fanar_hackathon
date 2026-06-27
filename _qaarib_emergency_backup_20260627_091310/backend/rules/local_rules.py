@@ -119,8 +119,6 @@ CALENDAR_WORDS = [
     "add to my calendar", "put it in my calendar", "put this in my calendar", "calendar invite",
     "make a calendar", "create a calendar", "save this event", "schedule this", "schedule it",
     "make an event", "create an event", "ics", ".ics", "calendar file",
-    "mark it on my calendar", "mark on my calendar", "mark my calendar",
-    "add it to calendar", "add it to my calendar", "on my calendar", "in my calendar",
 ]
 
 URL_RE = re.compile(r"https?://[^\s<>'\")]+", re.I)
@@ -206,16 +204,6 @@ def _has_any(text, words):
     return any(word in text for word in words)
 
 
-def _has_any_word(text, words):
-    """Word-boundary version of _has_any. Prevents false matches like
-    'pub' inside 'public' or 'bar' inside 'barber'. Use for short risky tokens.
-    """
-    for word in words:
-        if re.search(r"\b" + re.escape(word) + r"\b", text):
-            return True
-    return False
-
-
 def _extract_url(text):
     m = URL_RE.search(text or "")
     if not m:
@@ -241,7 +229,7 @@ def _is_calendar_request(user_prompt, history=""):
     if _has_any(text, CALENDAR_WORDS):
         return True
     # Natural command: "remind/schedule/add <thing> tomorrow at 7".
-    if any(w in text for w in ["remind me", "schedule", "add", "book", "save", "mark"]) and any(w in text for w in ["today", "tomorrow", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday", "am", "pm", ":"]):
+    if any(w in text for w in ["remind me", "schedule", "add", "book", "save"]) and any(w in text for w in ["today", "tomorrow", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday", "am", "pm", ":"]):
         return "calendar" in text or "event" in text or "remind" in text or "schedule" in text
     return False
 
@@ -249,29 +237,6 @@ def _is_calendar_request(user_prompt, history=""):
 def _is_empty_prompt(user_prompt):
     return not _clean(user_prompt)
 
-
-
-def _is_self_location_question(user_prompt):
-    text = _clean(user_prompt)
-    # Do not catch real destination questions such as "where am I going to eat".
-    if re.search(r"\b(where am i)\s+(going|supposed|meeting|picking|dropping|eating|heading)\b", text):
-        return False
-    # If a named place exists in the prompt, resolve/route it instead of giving the GPS limitation answer.
-    try:
-        if _mentioned_locations(user_prompt):
-            return False
-    except NameError:
-        pass
-    patterns = [
-        r"^where am i located\??$",
-        r"^what is my current location\??$",
-        r"^what's my current location\??$",
-        r"^my current location\??$",
-        r"^where exactly am i\??$",
-        r"^locate me\??$",
-        r"^where am i\??$",
-    ]
-    return any(re.search(p, text) for p in patterns)
 
 def direct_answer_for_prompt(user_prompt, history=""):
     """Small deterministic replies for identity/language/no-op cases.
@@ -284,11 +249,8 @@ def direct_answer_for_prompt(user_prompt, history=""):
     if not text:
         return "I'm here — send me the actual request when you're ready."
 
-    if _is_self_location_question(user_prompt):
-        return "I don’t have live location access in this CLI. Tell me your starting area, nearest landmark, or station — for example 'I’m at QCRI' or 'I’m near DECC' — and I can resolve it or route from there."
-
     if any(phrase in text for phrase in [
-        "where am i located", "what is my location",
+        "where am i located", "where am i", "what is my location",
         "my current location", "where exactly am i", "locate me",
     ]):
         return (
@@ -344,25 +306,6 @@ def _is_short_greeting(text):
         return all(t in GREETING_WORDS for t in tokens if t)
     return False
 
-
-
-def get_local_direct_answer(user_prompt, history=""):
-    """Pre-router guard: return a deterministic answer without calling Fanar.
-
-    Used by both CLI (app.py) and server (server.py) BEFORE build_router_prompt().
-    Returns a string if this prompt should be answered locally, else None.
-    """
-    # Named direct-answer cases (language correction, identity, GPS, injection, etc.)
-    answer = direct_answer_for_prompt(user_prompt, history)
-    if answer:
-        return answer
-
-    # Short greetings get a friendly branded intro instead of routing to Fanar.
-    text = _clean(user_prompt)
-    if _is_short_greeting(text):
-        return "Wa alaikum assalam — I'm Qaarib, Qatar's local assistant powered by Fanar. I can help with metro/tram routes, Qatar places, web search, calendar events, current time, and more. What do you need?"
-
-    return None
 
 def force_no_tool(user_prompt):
     text = _clean(user_prompt)
@@ -494,10 +437,9 @@ def _is_nightlife_request(user_prompt, history=""):
     text = _clean(user_prompt)
     joined = f"{text}\n{_clean(history)}"
     # A short follow-up like "downtown" should inherit nightlife context.
-    if _has_any(text, DOWNTOWN_WORDS) and _has_any_word(_clean(history), NIGHTLIFE_WORDS):
+    if _has_any(text, DOWNTOWN_WORDS) and _has_any(_clean(history), NIGHTLIFE_WORDS):
         return True
-    # Use word-boundary matching so 'pub' does not match inside 'public transport'.
-    return _has_any_word(joined, NIGHTLIFE_WORDS) and (_has_any_word(text, NIGHTLIFE_WORDS) or _has_any(text, DOWNTOWN_WORDS) or _has_any(text, ["near", "nearby", "rn", "where"]))
+    return _has_any(joined, NIGHTLIFE_WORDS) and (_has_any(text, NIGHTLIFE_WORDS) or _has_any(text, DOWNTOWN_WORDS) or _has_any(text, ["near", "nearby", "rn", "where"]))
 
 def _nightlife_location(user_prompt, history=""):
     text = _clean(user_prompt)
@@ -941,49 +883,32 @@ def should_add_web_for_route(user_prompt):
     return any(word in text for word in ["tram", "shuttle", "tunnel", "covered walkway", "indoor route", "metro schedule", "bus"])
 
 
-def _improve_all_queries(router_data, user_prompt, history):
-    """Apply Qatar-scoping query improvement to whatever tools are in the plan.
+def apply_local_router_rules(user_prompt, history, router_data):
+    text = _clean(user_prompt)
 
-    This is pure value-add and never changes which tools run. It only rewrites
-    the per-tool query strings so Fanar's chosen tools receive well-scoped,
-    Qatar-local queries.
-    """
-    tools = router_data.get("tools", [])
-    router_data.setdefault("queries", {})
-    q = router_data["queries"]
+    direct = direct_answer_for_prompt(user_prompt, history)
+    if direct:
+        return {"tools": [], "queries": {}, "reason": "local_direct_answer_rule", "confidence": 1.0, "direct_answer": direct}
 
-    if "route_plan" in tools:
-        q["route_plan"] = improve_route_query(q.get("route_plan", ""), user_prompt, history)
-        # Fanar may forget that a transit prompt also wants live web context.
-        if should_add_web_for_route(user_prompt) and "web_search" not in tools:
-            tools.append("web_search")
-            q["web_search"] = improve_web_query("", user_prompt, history)
-    if "web_search" in tools:
-        q["web_search"] = improve_web_query(q.get("web_search", ""), user_prompt, history)
-    if "place_lookup" in tools:
-        q["place_lookup"] = improve_place_query(q.get("place_lookup", ""), user_prompt, history)
-    if "web_scrape" in tools:
-        q["web_scrape"] = improve_web_scrape_query(q.get("web_scrape", ""), user_prompt, history)
-    if "calendar_event" in tools:
-        q["calendar_event"] = improve_calendar_query(q.get("calendar_event", ""), user_prompt, history)
-    if "time_task" in tools:
-        q["time_task"] = improve_time_task_query(q.get("time_task", ""), user_prompt, history)
-    if "location_resolver" in tools:
-        q["location_resolver"] = improve_location_resolver_query(q.get("location_resolver", ""), user_prompt, history)
+    if force_no_tool(user_prompt):
+        return {"tools": [], "queries": {}, "reason": "local_no_tool_rule", "confidence": 1.0}
 
-    router_data["tools"] = tools
-    return router_data
+    if _is_location_resolver_request(user_prompt, history):
+        return {
+            "tools": ["location_resolver"],
+            "queries": {"location_resolver": improve_location_resolver_query("", user_prompt, history)},
+            "reason": "local_location_resolver_agent_rule",
+            "confidence": 1.0,
+        }
 
+    if _is_time_task_parse_request(user_prompt, history):
+        return {
+            "tools": ["time_task"],
+            "queries": {"time_task": improve_time_task_query("", user_prompt, history)},
+            "reason": "local_timetask_agent_rule",
+            "confidence": 1.0,
+        }
 
-def _local_rule_plan(user_prompt, history):
-    """Deterministic fallback/correction plans, keyed by intent predicate.
-
-    Returns a router_data dict if a local rule confidently applies, else None.
-    In the inverted design this is a SAFETY NET: it is consulted only when
-    Fanar's own plan is empty/unusable, or to correct a specific known-wrong
-    routing. It is no longer an unconditional override.
-    """
-    # Calendar + scrape combined
     if _is_calendar_request(user_prompt, history) and _is_web_scrape_request(user_prompt, history):
         return {
             "tools": ["web_scrape", "calendar_event"],
@@ -991,32 +916,34 @@ def _local_rule_plan(user_prompt, history):
                 "web_scrape": improve_web_scrape_query("", user_prompt, history),
                 "calendar_event": improve_calendar_query("", user_prompt, history),
             },
-            "reason": "local_scrape_and_calendar_rule", "confidence": 1.0,
+            "reason": "local_scrape_and_calendar_rule",
+            "confidence": 1.0,
         }
-    if _is_location_resolver_request(user_prompt, history):
-        return {
-            "tools": ["location_resolver"],
-            "queries": {"location_resolver": improve_location_resolver_query("", user_prompt, history)},
-            "reason": "local_location_resolver_agent_rule", "confidence": 1.0,
-        }
-    if _is_time_task_parse_request(user_prompt, history):
-        return {
-            "tools": ["time_task"],
-            "queries": {"time_task": improve_time_task_query("", user_prompt, history)},
-            "reason": "local_timetask_agent_rule", "confidence": 1.0,
-        }
+
     if _is_calendar_request(user_prompt, history):
         return {
             "tools": ["calendar_event"],
             "queries": {"calendar_event": improve_calendar_query("", user_prompt, history)},
-            "reason": "local_calendar_event_rule", "confidence": 1.0,
+            "reason": "local_calendar_event_rule",
+            "confidence": 1.0,
         }
+
     if _is_web_scrape_request(user_prompt, history):
         return {
             "tools": ["web_scrape"],
             "queries": {"web_scrape": improve_web_scrape_query("", user_prompt, history)},
-            "reason": "local_web_scrape_rule", "confidence": 1.0,
+            "reason": "local_web_scrape_rule",
+            "confidence": 1.0,
         }
+
+    if _is_food_recommendation_request(user_prompt, history):
+        return {
+            "tools": ["place_lookup"],
+            "queries": {"place_lookup": improve_place_query("", user_prompt, history)},
+            "reason": "local_lucky_food_recommendation_rule",
+            "confidence": 1.0,
+        }
+
     if _is_location_disambiguation_request(user_prompt, history):
         destination = _destination_after_marker(user_prompt) or _find_location(user_prompt, "")
         origin = _route_origin_for_disambiguation(user_prompt, history)
@@ -1028,7 +955,13 @@ def _local_rule_plan(user_prompt, history):
         if origin:
             tools.insert(0, "route_plan")
             queries["route_plan"] = f"{origin} to {destination} by public transport"
-        return {"tools": tools, "queries": queries, "reason": "local_location_disambiguation_rule", "confidence": 1.0}
+        return {
+            "tools": tools,
+            "queries": queries,
+            "reason": "local_location_disambiguation_rule",
+            "confidence": 1.0,
+        }
+
     if _is_destination_access_request(user_prompt, history):
         return {
             "tools": ["route_plan", "place_lookup", "web_search"],
@@ -1037,14 +970,10 @@ def _local_rule_plan(user_prompt, history):
                 "place_lookup": improve_place_query("", user_prompt, history),
                 "web_search": improve_web_query("", user_prompt, history),
             },
-            "reason": "local_destination_access_rule", "confidence": 1.0,
+            "reason": "local_destination_access_rule",
+            "confidence": 1.0,
         }
-    if _is_food_recommendation_request(user_prompt, history):
-        return {
-            "tools": ["place_lookup"],
-            "queries": {"place_lookup": improve_place_query("", user_prompt, history)},
-            "reason": "local_lucky_food_recommendation_rule", "confidence": 1.0,
-        }
+
     if _is_resort_experience_request(user_prompt, history):
         return {
             "tools": ["place_lookup", "web_search"],
@@ -1052,8 +981,10 @@ def _local_rule_plan(user_prompt, history):
                 "place_lookup": improve_place_query("", user_prompt, history),
                 "web_search": improve_web_query("", user_prompt, history),
             },
-            "reason": "local_qatar_resort_experience_rule", "confidence": 1.0,
+            "reason": "local_qatar_resort_experience_rule",
+            "confidence": 1.0,
         }
+
     if _is_photo_spot_request(user_prompt, history):
         return {
             "tools": ["place_lookup", "web_search"],
@@ -1061,8 +992,20 @@ def _local_rule_plan(user_prompt, history):
                 "place_lookup": improve_place_query("", user_prompt, history),
                 "web_search": improve_web_query("", user_prompt, history),
             },
-            "reason": "local_qatar_photo_spots_rule", "confidence": 1.0,
+            "reason": "local_qatar_photo_spots_rule",
+            "confidence": 1.0,
         }
+
+    if _is_nightlife_request(user_prompt, history):
+        return {
+            "tools": ["place_lookup"],
+            "queries": {
+                "place_lookup": improve_place_query("", user_prompt, history),
+            },
+            "reason": "local_qatar_nightlife_scope_rule",
+            "confidence": 1.0,
+        }
+
     if _is_public_transit_route(user_prompt, history) or _is_public_transport_followup(user_prompt, history):
         tools = ["route_plan"]
         queries = {"route_plan": improve_route_query("", user_prompt, history)}
@@ -1070,104 +1013,56 @@ def _local_rule_plan(user_prompt, history):
             tools.append("web_search")
             queries["web_search"] = improve_web_query("", user_prompt, history)
         return {"tools": tools, "queries": queries, "reason": "local_network_transit_route_rule", "confidence": 1.0}
-    if _is_nightlife_request(user_prompt, history):
-        return {
-            "tools": ["place_lookup"],
-            "queries": {"place_lookup": improve_place_query("", user_prompt, history)},
-            "reason": "local_qatar_nightlife_scope_rule", "confidence": 1.0,
-        }
+
     if is_budget_followup(user_prompt, history):
         return {
             "tools": ["place_lookup", "web_search"],
             "queries": {"place_lookup": improve_place_query("", user_prompt, history), "web_search": improve_web_query("", user_prompt, history)},
-            "reason": "local_budget_followup_context_rule", "confidence": 1.0,
+            "reason": "local_budget_followup_context_rule",
+            "confidence": 1.0,
         }
-    _text = _clean(user_prompt)
-    if _is_qcri_minaretein_current(_text) and ("how do i get" in _text or "directions" in _text or _has_any(_text, HEAT_WORDS) or _has_any(_text, DRIVE_WORDS)):
+
+    if _is_qcri_minaretein_current(text) and ("how do i get" in text or "directions" in text or _has_any(text, HEAT_WORDS) or _has_any(text, DRIVE_WORDS)):
         return {"tools": ["route_plan"], "queries": {"route_plan": improve_route_query("", user_prompt, history)}, "reason": "local_qcri_minaretein_route_rule", "confidence": 1.0}
+
     if is_route_correction(user_prompt, history):
         return {"tools": ["route_plan"], "queries": {"route_plan": improve_route_query("", user_prompt, history)}, "reason": "local_route_correction_rule", "confidence": 1.0}
+
     if is_directions_followup(user_prompt, history):
         origin = _extract_recent_user_location(history)
         destination = _extract_last_place(history)
         if destination:
             return {"tools": ["route_plan"], "queries": {"route_plan": f"{origin} to {destination}"}, "reason": "local_directions_followup_rule", "confidence": 1.0}
+
     if _is_nearby_food_request(user_prompt):
         tools = ["place_lookup"]
-        queries = {"place_lookup": improve_place_query("", user_prompt, history)}
-        if _is_qahwa_dates_request(user_prompt) or "highly rated" in _text:
+        queries = {"place_lookup": improve_place_query(router_data.get("queries", {}).get("place_lookup", ""), user_prompt, history)}
+        if _is_qahwa_dates_request(user_prompt) or "highly rated" in text:
             tools.append("web_search")
-            queries["web_search"] = improve_web_query("", user_prompt, history)
+            queries["web_search"] = improve_web_query(router_data.get("queries", {}).get("web_search", ""), user_prompt, history)
         return {"tools": tools, "queries": queries, "reason": "local_nearby_food_place_rule", "confidence": 1.0}
-    return None
 
+    if "route_plan" in router_data.get("tools", []):
+        router_data.setdefault("queries", {})
+        router_data["queries"]["route_plan"] = improve_route_query(router_data["queries"].get("route_plan", ""), user_prompt, history)
+        if should_add_web_for_route(user_prompt) and "web_search" not in router_data["tools"]:
+            router_data["tools"].append("web_search")
+            router_data["queries"]["web_search"] = improve_web_query("", user_prompt, history)
 
-# Specific known-wrong corrections: cases where if Fanar picks these tools we
-# override, because the deterministic local handling is provably better.
-def _should_override_fanar(user_prompt, history, router_data):
-    """Return a corrected plan ONLY when Fanar is provably wrong for a
-    high-value, well-tested intent. Conservative and ADDITIVE: we keep Fanar's
-    useful tools (e.g. its web_search) and add the missing deterministic one.
-    """
-    fanar_tools = list(router_data.get("tools", []) or [])
-    fanar_queries = dict(router_data.get("queries", {}) or {})
+    if "web_scrape" in router_data.get("tools", []):
+        router_data.setdefault("queries", {})
+        router_data["queries"]["web_scrape"] = improve_web_scrape_query(router_data["queries"].get("web_scrape", ""), user_prompt, history)
 
-    # Transit routes: clearly a public-transit request but Fanar missed route_plan.
-    if (_is_public_transit_route(user_prompt, history) or _is_public_transport_followup(user_prompt, history)):
-        if "route_plan" not in fanar_tools:
-            plan = _local_rule_plan(user_prompt, history)
-            if plan:
-                # Preserve any web_search Fanar already wanted.
-                if "web_search" in fanar_tools and "web_search" not in plan["tools"]:
-                    plan["tools"].append("web_search")
-                    plan["queries"]["web_search"] = improve_web_query(
-                        fanar_queries.get("web_search", ""), user_prompt, history)
-                return plan
-    # Calendar creation request Fanar missed.
-    if _is_calendar_request(user_prompt, history) and "calendar_event" not in fanar_tools:
-        return _local_rule_plan(user_prompt, history)
-    # Location disambiguation (DECC vs QNCC) must not be answered as plain chat.
-    if _is_location_disambiguation_request(user_prompt, history) and not fanar_tools:
-        return _local_rule_plan(user_prompt, history)
-    return None
+    if "calendar_event" in router_data.get("tools", []):
+        router_data.setdefault("queries", {})
+        router_data["queries"]["calendar_event"] = improve_calendar_query(router_data["queries"].get("calendar_event", ""), user_prompt, history)
 
+    if "time_task" in router_data.get("tools", []):
+        router_data.setdefault("queries", {})
+        router_data["queries"]["time_task"] = improve_time_task_query(router_data["queries"].get("time_task", ""), user_prompt, history)
 
-def apply_local_router_rules(user_prompt, history, router_data):
-    """Fanar-led routing with deterministic guardrails as a safety net.
+    if "location_resolver" in router_data.get("tools", []):
+        router_data.setdefault("queries", {})
+        router_data["queries"]["location_resolver"] = improve_location_resolver_query(router_data["queries"].get("location_resolver", ""), user_prompt, history)
 
-    Order of trust:
-      1. Hard deterministic non-LLM answers (greetings/GPS/identity/no-op).
-      2. Fanar's tool selection is the DEFAULT plan; we improve its queries.
-      3. If Fanar returned nothing usable, fall back to a local rule plan.
-      4. Narrow, well-tested corrections override Fanar only when it is
-         provably wrong for a high-value intent (transit/calendar/disambiguation).
-    """
-    text = _clean(user_prompt)
-
-    # 1. Deterministic direct answers (no tool, no Fanar responder).
-    direct = direct_answer_for_prompt(user_prompt, history)
-    if direct:
-        return {"tools": [], "queries": {}, "reason": "local_direct_answer_rule", "confidence": 1.0, "direct_answer": direct}
-
-    if force_no_tool(user_prompt):
-        return {"tools": [], "queries": {}, "reason": "local_no_tool_rule", "confidence": 1.0}
-
-    fanar_tools = list(router_data.get("tools", []) or [])
-
-    # 4. Narrow correction: Fanar provably wrong for a high-value intent.
-    override = _should_override_fanar(user_prompt, history, router_data)
-    if override:
-        override["reason"] = override.get("reason", "local_rule") + "_correction"
-        return override
-
-    # 2. Trust Fanar when it produced a usable plan: just improve its queries.
-    if fanar_tools:
-        return _improve_all_queries(router_data, user_prompt, history)
-
-    # 3. Fanar returned no tools — consult the local rule net.
-    fallback = _local_rule_plan(user_prompt, history)
-    if fallback:
-        return fallback
-
-    # Nothing fired anywhere: hand back Fanar's (empty) plan unchanged.
     return router_data

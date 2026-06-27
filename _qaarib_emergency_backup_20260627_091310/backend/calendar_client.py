@@ -130,39 +130,6 @@ def _parse_date(text, now):
 def _parse_time(text):
     lower = text.lower()
 
-    def _force_pm(lower_text):
-        return any(word in lower_text for word in ["pm", "evening", "night", "tonight"])
-
-    def _to_24h(hour, lower_text):
-        hour = int(hour)
-        if _force_pm(lower_text) and hour != 12:
-            hour += 12
-        if "am" in lower_text and hour == 12:
-            hour = 0
-        return hour
-
-    # Natural time phrases before broad daypart defaults.
-    m = re.search(r"\bquarter\s+past\s+(\d{1,2})\b", lower)
-    if m:
-        hour = _to_24h(m.group(1), lower)
-        return time(hour, 15), f"quarter past {m.group(1)}"
-
-    m = re.search(r"\bhalf\s+past\s+(\d{1,2})\b", lower)
-    if m:
-        hour = _to_24h(m.group(1), lower)
-        return time(hour, 30), f"half past {m.group(1)}"
-
-    m = re.search(r"\bquarter\s+to\s+(\d{1,2})\b", lower)
-    if m:
-        target = _to_24h(m.group(1), lower)
-        hour = (target - 1) % 24
-        return time(hour, 45), f"quarter to {m.group(1)}"
-
-    m = re.search(r"\b(\d{1,2})\s*o['’]?clock\b", lower)
-    if m:
-        hour = _to_24h(m.group(1), lower)
-        return time(hour, 0), f"{m.group(1)} o'clock"
-
     m = re.search(r"\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b", lower)
     if m:
         hour = int(m.group(1)); minute = int(m.group(2) or 0); ampm = m.group(3)
@@ -212,26 +179,12 @@ def _parse_title(text):
     title = _clean(text)
     title = re.sub(r"https?://\S+", "", title)
 
-    # Remove parenthetical duration fragments early, before they become "(its min".
-    title = re.sub(
-        r"\([^)]*(?:for\s+)?\d+(?:\.\d+)?\s*(?:hours?|hrs?|h|minutes?|mins?|m)[^)]*\)",
-        "",
-        title,
-        flags=re.I,
-    )
-
     replacements = [
-        (r"^i\s+have\s+(a\s+|an\s+)?", ""),
-        (r"^i\s+need\s+to\s+", ""),
-        (r"\bmark\s+it\s+on\s+my\b", ""),
-        (r"\bmark\s+on\s+my\b", ""),
-        (r"\bmark\s+my\b", ""),
-        (r"\bit\s+on\s+my\b", ""),
-        (r"\b(add|put|create|make|schedule|save|book|mark)\b", ""),
-        (r"\b(to|in|into|on)\s+my\s+google\s+calendar\b", ""),
-        (r"\b(to|in|into|on)\s+google\s+calendar\b", ""),
-        (r"\b(to|in|into|on)\s+my\s+calendar\b", ""),
-        (r"\b(to|in|into|on)\s+the\s+calendar\b", ""),
+        (r"\b(add|put|create|make|schedule|save|book)\b", ""),
+        (r"\b(to|in|into)\s+my\s+google\s+calendar\b", ""),
+        (r"\b(to|in|into)\s+google\s+calendar\b", ""),
+        (r"\b(to|in|into)\s+my\s+calendar\b", ""),
+        (r"\b(to|in|into)\s+the\s+calendar\b", ""),
         (r"\bgoogle\s+calendar\b", ""),
         (r"\bcalendar\s+event\s+for\b", ""),
         (r"\bevent\s+for\b", ""),
@@ -243,34 +196,17 @@ def _parse_title(text):
     for pat, repl in replacements:
         title = re.sub(pat, repl, title, flags=re.I)
 
-    # Remove dates, weekdays, natural time phrases, numeric times, and durations.
-    title = re.sub(r"\b(next\s+)?(monday|mon|tuesday|tue|tues|wednesday|wed|thursday|thu|thur|thurs|friday|fri|saturday|sat|sunday|sun)\b", "", title, flags=re.I)
-    title = re.sub(r"\b(today|tomorrow|day after tomorrow|morning|afternoon|evening|night|tonight)\b", "", title, flags=re.I)
-    title = re.sub(r"\bquarter\s+past\s+\d{1,2}\b", "", title, flags=re.I)
-    title = re.sub(r"\bhalf\s+past\s+\d{1,2}\b", "", title, flags=re.I)
-    title = re.sub(r"\bquarter\s+to\s+\d{1,2}\b", "", title, flags=re.I)
-    title = re.sub(r"\b\d{1,2}\s*o['’]?clock\b", "", title, flags=re.I)
+    title = re.sub(r"\b(today|tomorrow|day after tomorrow|morning|afternoon|evening|night)\b", "", title, flags=re.I)
     title = re.sub(r"\b(on\s+)?\d{1,2}(?:st|nd|rd|th)?\s+(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t|tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)(?:\s+\d{4})?\b", "", title, flags=re.I)
     title = re.sub(r"\b(on\s+)?(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t|tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+\d{1,2}(?:st|nd|rd|th)?(?:\s+\d{4})?\b", "", title, flags=re.I)
     title = re.sub(r"\b(on|at|for)\s+\d{1,2}(:\d{2})?\s*(am|pm)?\b", "", title, flags=re.I)
     title = re.sub(r"\b\d{1,2}(:\d{2})?\s*(am|pm)\b", "", title, flags=re.I)
     title = re.sub(r"\bfor\s+\d+(?:\.\d+)?\s*(hours?|hrs?|h|minutes?|mins?|m)\b", "", title, flags=re.I)
-    title = re.sub(r"\([^)]*$", "", title, flags=re.I)  # dangling "(its min" style debris
-
-    # Repeatedly strip trailing connector junk.
-    for _ in range(4):
-        title = re.sub(r"\b(at|on|for|in|my|it|its|it's|the|a|an)\b\s*$", "", title, flags=re.I)
-        title = title.strip(" .,-:;()")
-
-    title = re.sub(r"\s+", " ", title).strip(" .,-:;()")
-
-    # Demo-safe cleanup for generic meeting prompts.
-    lower_title = title.lower()
-    if "meeting" in lower_title and len(lower_title.split()) <= 3:
-        return "Meeting"
-    if not title or len(title) < 3:
+    title = re.sub(r"\b(at|in|near)\s+[^,.]+$", "", title, flags=re.I)
+    title = _clean(title).strip(" .,-")
+    if len(title) < 3:
         return "Qaarib event"
-    return title[:80].strip().capitalize()
+    return title[:80]
 
 
 def _parse_event_basic(query):

@@ -1,185 +1,82 @@
 [
   {
-    "canonical_name": "Qatar Computing Research Institute",
-    "aliases": [
-      "QCRI",
-      "HBKU QCRI",
-      "Qatar Computing Research Institute"
-    ],
-    "query": "Qatar Computing Research Institute, Education City, Al Rayyan, Qatar",
-    "fallback_query": "Education City, Al Rayyan, Qatar",
-    "default_radius_m": 300,
-    "place_type": "organization"
+    "canonical_name": "Doha, Qatar",
+    "query": "Doha, Qatar",
+    "aliases": ["Doha", "Ad Dawhah", "Dawha", "الدوحة"],
+    "place_type_hint": "city",
+    "default_radius_m": 5000
   },
   {
-    "canonical_name": "Hamad Bin Khalifa University",
-    "aliases": [
-      "HBKU",
-      "Hamad Bin Khalifa University"
-    ],
-    "query": "Hamad Bin Khalifa University, Education City, Al Rayyan, Qatar",
+    "canonical_name": "Qatar Computing Research Institute",
+    "query": "Qatar Computing Research Institute, Education City, Al Rayyan, Qatar",
     "fallback_query": "Education City, Al Rayyan, Qatar",
-    "default_radius_m": 700,
-    "place_type": "organization"
+    "aliases": [
+      "QCRI",
+      "Qatar Computing Research Institute",
+      "معهد قطر لبحوث الحوسبة"
+    ],
+    "place_type_hint": "organization",
+    "default_radius_m": 300
   },
   {
     "canonical_name": "Education City",
-    "aliases": [
-      "Education City",
-      "Qatar Foundation",
-      "QF",
-      "المدينة التعليمية"
-    ],
     "query": "Education City, Al Rayyan, Qatar",
-    "fallback_query": "Al Rayyan, Qatar",
-    "default_radius_m": 2500,
-    "place_type": "district"
+    "aliases": ["Education City", "EC", "المدينة التعليمية"],
+    "place_type_hint": "district",
+    "default_radius_m": 1500
+  },
+  {
+    "canonical_name": "Qatar University",
+    "query": "Qatar University, Doha, Qatar",
+    "aliases": ["Qatar University", "QU", "جامعة قطر"],
+    "place_type_hint": "university",
+    "default_radius_m": 1200
   },
   {
     "canonical_name": "Qatar National Library",
-    "aliases": [
-      "QNL",
-      "Qatar National Library",
-      "مكتبة قطر الوطنية"
-    ],
     "query": "Qatar National Library, Education City, Al Rayyan, Qatar",
-    "fallback_query": "Education City, Al Rayyan, Qatar",
-    "default_radius_m": 400,
-    "place_type": "landmark"
+    "aliases": ["Qatar National Library", "QNL", "مكتبة قطر الوطنية"],
+    "place_type_hint": "library",
+    "default_radius_m": 400
   },
   {
-    "canonical_name": "Minaretein Center",
+    "canonical_name": "Hamad International Airport",
+    "query": "Hamad International Airport, Doha, Qatar",
     "aliases": [
-      "Minaretein",
-      "Minaretein Center",
-      "Minaratein",
-      "Minareten"
-    ],
-    "query": "Minaretein Center, Education City, Al Rayyan, Qatar",
-    "fallback_query": "Education City Mosque, Al Rayyan, Qatar",
-    "default_radius_m": 350,
-    "place_type": "landmark"
-  },
-  {
-    "canonical_name": "Hamad International Airport Terminal 1",
-    "aliases": [
-      "HIA",
-      "HIA T1",
-      "Hamad Airport",
       "Hamad International Airport",
-      "Hamad International Airport T1"
+      "Hamad Airport",
+      "HIA",
+      "مطار حمد الدولي"
     ],
-    "query": "Hamad International Airport Terminal 1, Doha, Qatar",
-    "fallback_query": "Hamad International Airport, Doha, Qatar",
-    "default_radius_m": 1000,
-    "place_type": "transport_hub"
+    "place_type_hint": "airport",
+    "default_radius_m": 2000
+  },
+  {
+    "canonical_name": "Lusail",
+    "query": "Lusail, Qatar",
+    "aliases": ["Lusail", "Lusail City", "لوسيل"],
+    "place_type_hint": "city",
+    "default_radius_m": 4000
+  },
+  {
+    "canonical_name": "Al Wakrah",
+    "query": "Al Wakrah, Qatar",
+    "aliases": ["Al Wakrah", "Al Wakra", "Wakrah", "الوكرة"],
+    "place_type_hint": "city",
+    "default_radius_m": 4000
   },
   {
     "canonical_name": "Msheireb Downtown Doha",
-    "aliases": [
-      "Msheireb",
-      "Msheireb Downtown",
-      "Downtown Doha",
-      "downtown",
-      "مشيرب"
-    ],
     "query": "Msheireb Downtown Doha, Qatar",
-    "fallback_query": "Msheireb Metro Station, Doha, Qatar",
-    "default_radius_m": 1600,
-    "place_type": "district"
+    "aliases": ["Msheireb", "Msheireb Downtown", "مشيرب"],
+    "place_type_hint": "district",
+    "default_radius_m": 1000
   },
   {
-    "canonical_name": "Doha",
-    "aliases": [
-      "Doha",
-      "الدوحة"
-    ],
-    "query": "Doha, Qatar",
-    "fallback_query": "Doha, Qatar",
-    "default_radius_m": 12000,
-    "place_type": "city"
-  },
-  {
-    "canonical_name": "Al Wakra",
-    "aliases": [
-      "Wakra",
-      "Al Wakra",
-      "Al Wakrah",
-      "الوكرة"
-    ],
-    "query": "Al Wakra, Qatar",
-    "fallback_query": "Al Wakra Metro Station, Qatar",
-    "default_radius_m": 5000,
-    "place_type": "city"
-  },
-  {
-    "canonical_name": "Lusail Marina",
-    "aliases": [
-      "Lusail Marina",
-      "Marina Lusail",
-      "Lusail Marina Promenade"
-    ],
-    "query": "Lusail Marina Promenade, Lusail, Qatar",
-    "fallback_query": "Lusail, Qatar",
-    "default_radius_m": 1500,
-    "place_type": "landmark"
-  },
-  {
-    "canonical_name": "Al Shaqab",
-    "aliases": [
-      "Al Shaqab",
-      "Shaqab",
-      "الشقب"
-    ],
-    "query": "Al Shaqab, Al Rayyan, Qatar",
-    "fallback_query": "Al Shaqab Metro Station, Al Rayyan, Qatar",
-    "default_radius_m": 1200,
-    "place_type": "district"
-  },
-  {
-    "canonical_name": "Al Rayyan Al Qadeem",
-    "aliases": [
-      "Al Rayyan Al Qadeem",
-      "Rayyan Al Qadeem",
-      "old rayyan"
-    ],
-    "query": "Al Rayyan Al Qadeem, Al Rayyan, Qatar",
-    "fallback_query": "Al Rayyan Al Qadeem Metro Station, Qatar",
-    "default_radius_m": 1200,
-    "place_type": "district"
-  },
-  {
-    "canonical_name": "Mansoura",
-    "aliases": [
-      "Mansoura",
-      "Al Mansoura"
-    ],
-    "query": "Al Mansoura, Doha, Qatar",
-    "fallback_query": "Mansoura Metro Station, Doha, Qatar",
-    "default_radius_m": 2000,
-    "place_type": "district"
-  },
-  {
-    "canonical_name": "Al Doha Al Jadeeda",
-    "aliases": [
-      "Doha Al Jadeeda",
-      "Al Doha Al Jadeeda"
-    ],
-    "query": "Al Doha Al Jadeeda, Doha, Qatar",
-    "fallback_query": "Al Doha Al Jadeeda Metro Station, Doha, Qatar",
-    "default_radius_m": 1500,
-    "place_type": "district"
-  },
-  {
-    "canonical_name": "Ras Bu Aboud",
-    "aliases": [
-      "Ras Abu Aboud",
-      "Ras Bu Aboud",
-      "Ras Bu Abboud"
-    ],
-    "query": "Ras Bu Aboud, Doha, Qatar",
-    "fallback_query": "Ras Bu Aboud Metro Station, Doha, Qatar",
-    "default_radius_m": 1800,
-    "place_type": "district"
+    "canonical_name": "City Center Doha Mall",
+    "query": "City Center Doha Mall, Doha, Qatar",
+    "aliases": ["City Center", "City Centre", "City Center Doha", "سيتي سنتر"],
+    "place_type_hint": "mall",
+    "default_radius_m": 500
   }
 ]
