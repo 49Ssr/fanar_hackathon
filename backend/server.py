@@ -7,6 +7,7 @@ import time
 import re
 import threading
 import webbrowser
+import requests
 
 from fanar_client import ask_fanar_timed
 from chat_session import build_prompt, append_turn, reset_history, append_router_decision, load_history
@@ -29,6 +30,12 @@ FANAR_9B_MODEL = "Fanar-C-1-8.7B"
 router_model = os.getenv("FANAR_ROUTER_MODEL", FANAR_9B_MODEL)
 responder_model = os.getenv("FANAR_RESPONDER_MODEL", FANAR_9B_MODEL)
 USE_FANAR_ROUTER = os.getenv("QAARIB_USE_FANAR_ROUTER", "0") == "1"
+AURA_TTS_ENABLED = os.getenv("FANAR_AURA_TTS_ENABLED", "1") == "1"
+AURA_TTS_MODEL = os.getenv("FANAR_AURA_TTS_MODEL", "Fanar-Aura-TTS-2")
+AURA_TTS_VOICE = os.getenv("FANAR_AURA_TTS_VOICE", "Hamad")
+AURA_TTS_FORMAT = os.getenv("FANAR_AURA_TTS_FORMAT", "mp3")
+AURA_TTS_TIMEOUT = int(os.getenv("FANAR_AURA_TTS_TIMEOUT", "12"))
+FANAR_API_KEY = os.getenv("FANAR_API_KEY")
 
 
 def _clean(text):
@@ -170,9 +177,33 @@ def frontend_index():
     return Response(html, mimetype="text/html")
 
 
+@app.route("/aura_tts", methods=["POST"])
+def aura_tts():
+    if not AURA_TTS_ENABLED or not FANAR_API_KEY:
+        return jsonify({"error": "Fanar Aura TTS unavailable"}), 503
+    data = request.get_json(silent=True) or {}
+    text = re.sub(r"\s+", " ", (data.get("text") or "")).strip()
+    if not text:
+        return jsonify({"error": "No text provided"}), 400
+    text = text[:700]
+    try:
+        r = requests.post(
+            "https://api.fanar.qa/v1/audio/speech",
+            headers={"Authorization": f"Bearer {FANAR_API_KEY}", "Content-Type": "application/json"},
+            json={"model": AURA_TTS_MODEL, "input": text, "voice": AURA_TTS_VOICE, "response_format": AURA_TTS_FORMAT, "stream": False},
+            timeout=AURA_TTS_TIMEOUT,
+        )
+        r.raise_for_status()
+        mimetype = "audio/wav" if AURA_TTS_FORMAT == "wav" else "audio/mpeg"
+        return Response(r.content, mimetype=mimetype, headers={"Cache-Control": "no-store"})
+    except Exception as exc:
+        print(f"Fanar Aura TTS failed: {str(exc)[:180]}")
+        return jsonify({"error": "Fanar Aura TTS failed or is not authorized"}), 503
+
+
 @app.route("/<path:filename>", methods=["GET"])
 def frontend_asset(filename):
-    if filename in {"chat", "reset", "health"}:
+    if filename in {"chat", "reset", "health", "aura_tts"}:
         return "not found", 404
     path = FRONTEND_DIR / filename
     if path.exists() and path.is_file():
