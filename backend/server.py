@@ -14,7 +14,7 @@ from chat_session import (
     load_history,
 )
 from router import build_router_prompt, parse_router_response
-from rules.local_rules import apply_local_router_rules, get_local_direct_answer, get_pre_router_plan
+from rules.local_rules import apply_local_router_rules, get_pre_router_plan, _local_rule_plan
 
 # Reuse the CLI's real execution path instead of maintaining a divergent copy.
 # app.py is safe to import: its CLI loop is under if __name__ == "__main__".
@@ -29,7 +29,9 @@ app = flask_app  # keep the conventional name for Flask runners
 CORS(app)
 
 router_model = os.getenv("FANAR_ROUTER_MODEL", "Fanar")
-responder_model = os.getenv("FANAR_RESPONDER_MODEL", "Fanar-C-2-27B")
+# Demo-safe default: the 27B responder is too slow for live judging.
+# Teams can still opt into it with FANAR_RESPONDER_MODEL=Fanar-C-2-27B.
+responder_model = os.getenv("FANAR_RESPONDER_MODEL", "Fanar")
 
 
 @app.route("/health", methods=["GET"])
@@ -57,7 +59,7 @@ def chat():
     try:
         history_before_turn = load_history()
 
-        # ── Pre-router deterministic plan ─────────────────────────────────────
+        # ── Pre-router deterministic direct/route plan ─────────────────────────
         # Greetings, identity, GPS, current time, calendar creation, and routes
         # between known Qatar locations are handled WITHOUT calling Fanar. This
         # is the reliability backbone: these never time out, even if Fanar is down.
@@ -81,26 +83,36 @@ def chat():
             return jsonify({"response": response, "router": pre,
                             "timing": {"router_ms": 0, "tool_ms": tool_ms, "responder_ms": 0}})
 
-        # ── Fanar router (open-ended intent) ──────────────────────────────────
-        try:
-            router_prompt = build_router_prompt(user_prompt, history_before_turn)
-            router_raw, router_ms = ask_fanar_timed(router_prompt, router_model, max_tokens=350)
-            router_data = parse_router_response(router_raw)
-        except Exception:
-            # Router timed out/failed: fall back to local rules with an empty plan
-            # so transit/place rules can still fire deterministically.
-            router_data = apply_local_router_rules(
-                user_prompt, history_before_turn,
-                {"tools": [], "queries": {}, "reason": "router_fallback", "confidence": 0.0},
-            )
+        # ── Local tool-intent router fast path ──────────────────────────────────
+        # For obvious demo intents (places, food, nightlife, photo spots, resorts,
+        # URL scrape, etc.) skip the Fanar router and only use Fanar once if we
+        # need it to compose tool results. This removes the common 2-call latency.
+        local_plan = _local_rule_plan(user_prompt, history_before_turn)
+        if local_plan:
+            router_data = local_plan
             router_ms = 0
-            if not router_data.get("tools") and not router_data.get("direct_answer"):
-                fallback = ("Fanar is taking a moment right now. I can still help with specific local tasks: "
-                            "metro routes, current time, calendar events, or named Qatar places. Please restate your request.")
-                append_turn(user_prompt, fallback)
-                return jsonify({"response": fallback, "timing": {"router_ms": router_ms, "tool_ms": 0, "responder_ms": 0}})
+        else:
+            # ── Fanar router (open-ended / ambiguous intent) ───────────────────
+            try:
+                router_prompt = build_router_prompt(user_prompt, history_before_turn)
+                router_raw, router_ms = ask_fanar_timed(router_prompt, router_model, max_tokens=300)
+                router_data = parse_router_response(router_raw)
+            except Exception:
+                # Router timed out/failed: fall back to local rules with an empty plan
+                # so transit/place rules can still fire deterministically.
+                router_data = apply_local_router_rules(
+                    user_prompt, history_before_turn,
+                    {"tools": [], "queries": {}, "reason": "router_fallback", "confidence": 0.0},
+                )
+                router_ms = 0
+                if not router_data.get("tools") and not router_data.get("direct_answer"):
+                    fallback = ("Fanar is taking a moment right now. I can still help with specific local tasks: "
+                                "metro routes, current time, calendar events, or named Qatar places. Please restate your request.")
+                    append_turn(user_prompt, fallback)
+                    return jsonify({"response": fallback, "timing": {"router_ms": router_ms, "tool_ms": 0, "responder_ms": 0}})
 
-        router_data = apply_local_router_rules(user_prompt, history_before_turn, router_data)
+            router_data = apply_local_router_rules(user_prompt, history_before_turn, router_data)
+
         append_router_decision(router_data)
 
         policy_answer = router_data.get("direct_answer")
@@ -123,11 +135,12 @@ def chat():
             else:
                 try:
                     sent_prompt = build_prompt(user_prompt, tool_results=tool_results, active_tool_label=active_tool_label)
-                    response, responder_ms = ask_fanar_timed(sent_prompt, responder_model, max_tokens=900)
+                    response, responder_ms = ask_fanar_timed(sent_prompt, responder_model, max_tokens=500)
                 except Exception:
                     parts = [r.get("final_answer") or r.get("summary", "") for r in (tool_results or []) if r.get("final_answer") or r.get("summary")]
                     response = "\n".join(p for p in parts if p).strip() or (
-                        "Fanar is taking a moment. For specific tasks like routes, time, or calendar events, try restating the request directly.")
+                        "Fanar is taking a moment. For specific tasks like routes, time, or calendar events, try restating the request directly."
+                    )
                     responder_ms = 0
 
         append_turn(user_prompt, response)
