@@ -29,10 +29,10 @@ flask_app = Flask(__name__)
 app = flask_app  # keep the conventional name for Flask runners
 CORS(app)
 
-router_model = os.getenv("FANAR_ROUTER_MODEL", "Fanar")
-# Demo-safe default: the 27B responder is too slow for live judging.
-# Teams can still opt into it with FANAR_RESPONDER_MODEL=Fanar-C-2-27B.
-responder_model = os.getenv("FANAR_RESPONDER_MODEL", "Fanar")
+# Hackathon load fallback: organisers recommended the ~9B model while Fanar is overloaded.
+FANAR_9B_MODEL = "Fanar-C-1-8.7B"
+router_model = os.getenv("FANAR_ROUTER_MODEL", FANAR_9B_MODEL)
+responder_model = os.getenv("FANAR_RESPONDER_MODEL", FANAR_9B_MODEL)
 
 
 def _clean(text):
