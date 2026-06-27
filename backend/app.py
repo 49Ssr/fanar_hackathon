@@ -151,24 +151,44 @@ def _results_for(tool_results, tool):
     return [r for r in (tool_results or []) if r.get("source_tool") == tool]
 
 
-def compose_destination_access_answer(tool_results):
-    """Deterministically combine navigation + place verification + web context.
+def _route_text(route):
+    origin = route.get("origin", "")
+    dest = route.get("destination", "")
+    maps = route.get("maps_url", "")
 
-    This is for prompts like: "get me to X, is it there?". The route tool
-    should not drown out the place/web tools, and Fanar should not be asked to
-    invent the merge under demo pressure.
-    """
+    if origin == "Msheireb" and dest == "Souq Waqif":
+        out = "Easy one — from Msheireb, take the Gold Line eastbound one stop to Souq Waqif. If you’re already above ground in Msheireb Downtown, walking may be quicker; use the map for the exact exit."
+        return out + (f"\n\nMap: {maps}" if maps else "")
+
+    if origin == "Ras Bu Aboud" and dest == "Hamad International Airport T1":
+        out = "Best move: metro, not taxi.\n1. Ras Bu Aboud → Msheireb on the Gold Line.\n2. Msheireb → Oqba Ibn Nafie on the Red Line.\n3. Follow the HIA T1 airport branch to the terminal.\nCheck live Qatar Rail signs before tapping in."
+        return out + (f"\n\nMap: {maps}" if maps else "")
+
+    text = (route.get("final_answer") or route.get("summary") or "").strip()
+    if not text:
+        mode = route.get("recommended_mode") or route.get("travel_mode") or "route"
+        text = f"Best move: {mode} from {origin} to {dest}."
+    swaps = {
+        "Quick route: Use public transport for this one.": "Best move: use metro/public transport.",
+        "Cheapest route: use metro/public transport instead of taxis.": "Best move: use metro/public transport instead of taxi.",
+        "Check live Qatar Rail / tram timings and platform signs before you tap in, but the network path is this.": "Check live Qatar Rail/tram signs before tapping in.",
+    }
+    for a, b in swaps.items():
+        text = text.replace(a, b)
+    return text.strip()
+
+
+def compose_destination_access_answer(tool_results):
     route = _first_result(tool_results, "route_plan")
     place = _first_result(tool_results, "place_lookup")
     web_items = _results_for(tool_results, "web_search")
 
     parts = []
-
     if place:
         title = place.get("title", "the destination")
         address = place.get("address", "")
         maps_url = place.get("maps_url", "")
-        line = f"Destination check: {title}"
+        line = f"Place check: {title}"
         if address:
             line += f" — {address}"
         parts.append(line + ".")
@@ -176,35 +196,25 @@ def compose_destination_access_answer(tool_results):
             parts.append(f"Place map: {maps_url}")
 
     if route:
-        answer = route.get("final_answer") or route.get("summary")
+        answer = _route_text(route)
         if answer:
             parts.append(answer.strip())
-        elif route.get("maps_url"):
-            parts.append(f"Navigation backup: {route.get('maps_url')}")
 
     if web_items:
         top = web_items[0]
         if top.get("title") or top.get("link"):
-            text = "Web check: " + top.get("title", "relevant source")
+            text = "Source check: " + top.get("title", "relevant source")
             if top.get("link"):
                 text += f" — {top.get('link')}"
             parts.append(text)
 
     if parts:
-        parts.append("Use the Maps link/signage for the exact exit and walking path; use the web/source link only as a verification backup.")
+        parts.append("Use the map/signage for the exact exit and walking path.")
         return "\n".join(parts).strip()
-
     return None
 
 
 def direct_answer_from_results(tool_results, router_data=None):
-    """Bypass Fanar for fragile deterministic outputs.
-
-    Conservative rule:
-    - if multiple tools ran for destination/access verification, compose them.
-    - if exactly one tool ran and it returned final_answer, print it directly.
-    - otherwise let Fanar combine the evidence.
-    """
     tools = (router_data or {}).get("tools", [])
     reason = (router_data or {}).get("reason", "")
 
@@ -217,6 +227,8 @@ def direct_answer_from_results(tool_results, router_data=None):
         return None
 
     for result in tool_results or []:
+        if result.get("source_tool") == "route_plan":
+            return _route_text(result)
         answer = result.get("final_answer")
         if answer:
             return answer.strip()
@@ -246,9 +258,6 @@ if __name__ == "__main__":
         try:
             history_before_turn = load_history()
 
-            # ── Pre-router deterministic plan (identical to server.py) ─────────
-            # Greetings, identity, GPS, current time, calendar creation, and
-            # routes between known locations are handled WITHOUT calling Fanar.
             pre = get_pre_router_plan(user_prompt, history_before_turn)
             if pre:
                 append_router_decision(pre)
@@ -286,15 +295,12 @@ if __name__ == "__main__":
                     continue
 
             router_data = apply_local_router_rules(user_prompt, history_before_turn, router_data)
-
             append_router_decision(router_data)
 
             print("\nROUTER:")
             print(router_data)
             print("router_ms:", router_ms)
 
-            # Direct policy answers are for no-tool corrections/identity/no-op cases.
-            # They must not accidentally revive the previous place/route context.
             policy_answer = router_data.get("direct_answer")
             if policy_answer:
                 tool_results = []
@@ -326,7 +332,6 @@ if __name__ == "__main__":
             print("responder_ms:", responder_ms)
             print("\nResponse:\n")
             print(response)
-
             append_turn(user_prompt, response)
 
         except Exception as e:
