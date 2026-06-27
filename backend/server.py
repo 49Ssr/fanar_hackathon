@@ -4,6 +4,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 import os
 import time
+import re
 
 from fanar_client import ask_fanar_timed
 from chat_session import (
@@ -34,6 +35,30 @@ router_model = os.getenv("FANAR_ROUTER_MODEL", "Fanar")
 responder_model = os.getenv("FANAR_RESPONDER_MODEL", "Fanar")
 
 
+def _clean(text):
+    return re.sub(r"\s+", " ", (text or "").lower().strip())
+
+
+def _extended_greeting_answer(user_prompt):
+    """Catch natural greetings like 'salam alikum brother how u doing'.
+
+    These are not worth a Fanar router call during the demo. Keep this narrow so
+    real requests that happen to contain 'salam' still route normally.
+    """
+    text = _clean(user_prompt)
+    if not text:
+        return None
+    tokens = [t.strip("!?.،,;:") for t in text.split()]
+    if len(tokens) > 9:
+        return None
+    greeting_start = tokens[0] in {"hi", "hello", "hey", "yo", "salam", "salaam", "assalamu", "hala", "ahlan", "marhaba"}
+    has_how_are_you = any(p in text for p in ["how are you", "how u doing", "how you doing", "how r u", "how are u", "how's it going", "hows it going"])
+    has_salam_pair = ("salam" in tokens or "salaam" in tokens or "assalamu" in tokens) and any(t in {"alaikum", "alaykum", "alikum"} for t in tokens)
+    if greeting_start and (has_how_are_you or has_salam_pair):
+        return "Wa alaikum assalam — doing good. I’m Qaarib, ready for Qatar routes, places, events, and quick local help."
+    return None
+
+
 @app.route("/health", methods=["GET"])
 def health():
     return jsonify({"status": "ok", "service": "qaarib-backend"})
@@ -58,6 +83,14 @@ def chat():
 
     try:
         history_before_turn = load_history()
+
+        greeting = _extended_greeting_answer(user_prompt)
+        if greeting:
+            router_data = {"tools": [], "queries": {}, "reason": "local_extended_greeting", "confidence": 1.0, "direct_answer": greeting}
+            append_router_decision(router_data)
+            append_turn(user_prompt, greeting)
+            return jsonify({"response": greeting, "router": router_data,
+                            "timing": {"router_ms": 0, "tool_ms": 0, "responder_ms": 0}})
 
         # ── Pre-router deterministic direct/route plan ─────────────────────────
         # Greetings, identity, GPS, current time, calendar creation, and routes
