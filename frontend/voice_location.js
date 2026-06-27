@@ -2,6 +2,8 @@
   var currentLocation = null;
   var voiceReady = false;
   var recognition = null;
+  var auraVoiceMode = false;
+  var lastAudioUrl = null;
 
   function apiBase() {
     return window.QAARIB_API_BASE || 'http://localhost:5000';
@@ -28,7 +30,7 @@
         };
         status('location ready');
         resolve(currentLocation);
-      }, function (err) {
+      }, function () {
         status('location denied or unavailable');
         resolve(null);
       }, { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 });
@@ -65,6 +67,7 @@
       if (input && text) {
         input.value = text;
         input.focus();
+        auraVoiceMode = true;
         if (typeof window.sendMessage === 'function') window.sendMessage();
       }
     };
@@ -79,6 +82,7 @@
   function startVoice() {
     var input = document.getElementById('chatInput');
     var btn = document.querySelector('.input-action[title="Voice"]');
+    auraVoiceMode = true;
     if (btn) btn.textContent = '●';
     Promise.all([requestLocation(), requestMic()]).then(function () {
       recognition = recognition || setupSpeechRecognition();
@@ -94,6 +98,42 @@
         status('voice already listening');
       }
     });
+  }
+
+  function playAura(text) {
+    if (!auraVoiceMode || !text) return;
+    var clean = String(text).replace(/https?:\/\/\S+/g, '').replace(/\s+/g, ' ').trim();
+    if (!clean) return;
+    status('Fanar Aura speaking');
+    fetch(apiBase() + '/aura_tts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: clean })
+    })
+      .then(function (res) {
+        if (!res.ok) throw new Error('Aura unavailable');
+        return res.blob();
+      })
+      .then(function (blob) {
+        if (lastAudioUrl) URL.revokeObjectURL(lastAudioUrl);
+        lastAudioUrl = URL.createObjectURL(blob);
+        var audio = new Audio(lastAudioUrl);
+        audio.play().catch(function () { status('tap page to allow audio playback'); });
+      })
+      .catch(function () {
+        status('Fanar Aura unavailable; text reply only');
+      });
+  }
+
+  function wrapAppendBotText() {
+    if (typeof window.appendBotText !== 'function' || window.appendBotText.__auraWrapped) return false;
+    var original = window.appendBotText;
+    window.appendBotText = function (text) {
+      original(text);
+      playAura(text);
+    };
+    window.appendBotText.__auraWrapped = true;
+    return true;
   }
 
   var originalFetch = window.fetch.bind(window);
@@ -112,6 +152,8 @@
   window.QAARIB_LOCATION = function () { return currentLocation; };
   window.QAARIB_REQUEST_LOCATION = requestLocation;
   window.QAARIB_START_VOICE = startVoice;
+  window.QAARIB_PLAY_AURA = playAura;
+  window.QAARIB_AURA_MODE = function (enabled) { auraVoiceMode = enabled !== false; };
 
   document.addEventListener('DOMContentLoaded', function () {
     var btn = document.querySelector('.input-action[title="Voice"]');
@@ -124,5 +166,10 @@
     var intro = document.getElementById('intro-ui');
     if (intro) intro.addEventListener('click', function () { requestLocation(); });
     setTimeout(function () { requestLocation(); }, 900);
+    var tries = 0;
+    var timer = setInterval(function () {
+      tries += 1;
+      if (wrapAppendBotText() || tries > 20) clearInterval(timer);
+    }, 250);
   });
 })();
